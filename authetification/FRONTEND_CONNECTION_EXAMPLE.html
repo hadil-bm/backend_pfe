@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test de connexion à l'API</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .container {
+            border: 1px solid #ddd;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        input {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            box-sizing: border-box;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f4f4f4;
+            border-radius: 4px;
+            white-space: pre-wrap;
+        }
+        .error {
+            background-color: #ffebee;
+            color: #c62828;
+        }
+        .success {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test de connexion à l'API VM Provisioning</h1>
+    <p>URL de l'API: <strong>http://localhost:8080/api</strong></p>
+
+    <!-- Test Health Check -->
+    <div class="container">
+        <h2>1. Test Health Check</h2>
+        <button onclick="testHealth()">Tester /api/health</button>
+        <div id="healthResult" class="result" style="display:none;"></div>
+    </div>
+
+    <!-- Test Login -->
+    <div class="container">
+        <h2>2. Test Login</h2>
+        <input type="text" id="username" placeholder="Nom d'utilisateur" value="admin">
+        <input type="password" id="password" placeholder="Mot de passe" value="password">
+        <button onclick="testLogin()">Se connecter</button>
+        <div id="loginResult" class="result" style="display:none;"></div>
+    </div>
+
+    <!-- Test avec Token -->
+    <div class="container">
+        <h2>3. Test avec Token JWT</h2>
+        <input type="text" id="token" placeholder="Token JWT (sera rempli automatiquement après login)">
+        <button onclick="testWithToken()">Tester endpoint authentifié</button>
+        <div id="tokenResult" class="result" style="display:none;"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:8080/api';
+
+        // Test Health Check
+        async function testHealth() {
+            const resultDiv = document.getElementById('healthResult');
+            resultDiv.style.display = 'block';
+            resultDiv.textContent = 'Test en cours...';
+            resultDiv.className = 'result';
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/health`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                const data = await response.json();
+                resultDiv.textContent = `Status: ${response.status}\n\n${JSON.stringify(data, null, 2)}`;
+                resultDiv.className = response.ok ? 'result success' : 'result error';
+            } catch (error) {
+                resultDiv.textContent = `Erreur: ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+
+        // Test Login
+        async function testLogin() {
+            const resultDiv = document.getElementById('loginResult');
+            const tokenInput = document.getElementById('token');
+            resultDiv.style.display = 'block';
+            resultDiv.textContent = 'Connexion en cours...';
+            resultDiv.className = 'result';
+
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username: username,
+                        password: password
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok && data.token) {
+                    tokenInput.value = data.token;
+                    localStorage.setItem('token', data.token);
+                    resultDiv.textContent = `Connexion réussie!\n\nToken: ${data.token.substring(0, 50)}...\n\n${JSON.stringify(data, null, 2)}`;
+                    resultDiv.className = 'result success';
+                } else {
+                    resultDiv.textContent = `Erreur: ${JSON.stringify(data, null, 2)}`;
+                    resultDiv.className = 'result error';
+                }
+            } catch (error) {
+                resultDiv.textContent = `Erreur: ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+
+        // Test avec Token
+        async function testWithToken() {
+            const resultDiv = document.getElementById('tokenResult');
+            const token = document.getElementById('token').value || localStorage.getItem('token');
+            
+            if (!token) {
+                resultDiv.style.display = 'block';
+                resultDiv.textContent = 'Veuillez d\'abord vous connecter pour obtenir un token';
+                resultDiv.className = 'result error';
+                return;
+            }
+
+            resultDiv.style.display = 'block';
+            resultDiv.textContent = 'Test en cours...';
+            resultDiv.className = 'result';
+
+            try {
+                // Test avec un endpoint authentifié (par exemple, les notifications)
+                const response = await fetch(`${API_BASE_URL}/notifications`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                const data = await response.json();
+                resultDiv.textContent = `Status: ${response.status}\n\n${JSON.stringify(data, null, 2)}`;
+                resultDiv.className = response.ok ? 'result success' : 'result error';
+            } catch (error) {
+                resultDiv.textContent = `Erreur: ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+
+        // Charger le token depuis localStorage au chargement de la page
+        window.onload = function() {
+            const savedToken = localStorage.getItem('token');
+            if (savedToken) {
+                document.getElementById('token').value = savedToken;
+            }
+        };
+    </script>
+</body>
+</html>
+
