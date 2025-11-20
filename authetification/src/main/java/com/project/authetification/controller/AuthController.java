@@ -15,6 +15,8 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.*;
 
+
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -38,20 +40,27 @@ public class AuthController {
 
 
     @PostMapping("/register")
-    public ResponseEntity<?> registerUser(@RequestBody Map<String, String> registrationRequest) {
-        String username = registrationRequest.get("username");
-        String password = registrationRequest.get("password");
-        String email = registrationRequest.get("email");
-        String role = registrationRequest.get("role");
+    public ResponseEntity<?> registerUser(@RequestBody Map<String, Object> registrationRequest) {
+        String username = (String) registrationRequest.get("username");
+        String password = (String) registrationRequest.get("password");
+        String email = (String) registrationRequest.get("email");
+
+        // Récupérer role comme liste depuis JSON
+        List<String> roles;
+        try {
+            roles = (List<String>) registrationRequest.get("role");
+        } catch (ClassCastException e) {
+            return ResponseEntity.badRequest().body("Le rôle doit être une liste de chaînes.");
+        }
 
         if (username == null || username.trim().isEmpty() ||
                 password == null || password.trim().isEmpty() ||
                 email == null || email.trim().isEmpty() ||
-                role == null || role.trim().isEmpty()) {
-            return ResponseEntity.badRequest().body("Nom d'utilisateur, email, mot de passe et rôle sont requis.");
+                roles == null || roles.isEmpty()) {
+            return ResponseEntity.badRequest().body("Nom d'utilisateur, email, mot de passe et rôle(s) sont requis.");
         }
 
-        Optional<User> registeredUser = authService.register(username, email, password, role);
+        Optional<User> registeredUser = authService.register(username, email, password, roles);
 
         if (registeredUser.isPresent()) {
             return ResponseEntity.status(HttpStatus.CREATED).body("Utilisateur enregistré avec succès.");

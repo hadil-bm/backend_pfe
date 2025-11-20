@@ -1,7 +1,6 @@
 package com.project.authetification.config;
 
 import com.project.authetification.service.UserDetailsServiceImpl;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Bean;
@@ -15,8 +14,12 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
+
+import java.util.Arrays;
+import java.util.List;
 
 @Configuration
 public class SecurityConfig {
@@ -43,15 +46,24 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
+                // 1) API REST stateless + JWT : on désactive CSRF
                 .csrf(csrf -> csrf.disable())
-                .cors(cors -> {}) // activer CORS
+
+                // 2) On branche explicitement notre configuration CORS
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+
+                // 3) Pas de session (JWT stateless)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+
+                // 4) Autorisations
                 .authorizeHttpRequests(auth -> auth
-                        // Endpoints publics pour la santé et les informations de l'API
+                        // Endpoints publics pour la santé et les infos
                         .requestMatchers("/api/health", "/api/info").permitAll()
-                        // Endpoints d'authentification publics
-                        .requestMatchers("/api/auth/**").permitAll() // auth/login, register etc.
-                        // Routes pour les demandeurs (clients internes)
+                        // Endpoints d'authentification publics (login, register, etc.)
+                        .requestMatchers("/api/auth/**").permitAll()
+                        // Important : laisser /error public (Spring Boot 3 / Security 6)
+                        .requestMatchers("/error").permitAll()
+                        // Routes pour les demandeurs
                         .requestMatchers("/api/demandes/demandeur/create").hasAnyRole("DEMANDEUR", "ADMIN")
                         .requestMatchers("/api/demandes/demandeur/**").hasAnyRole("DEMANDEUR", "ADMIN")
                         // Routes pour l'équipe Cloud
@@ -60,14 +72,17 @@ public class SecurityConfig {
                         .requestMatchers("/api/support-system/**").hasAnyRole("EQUIPESUPPORT", "ADMIN")
                         // Routes pour les administrateurs
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        // Routes pour le monitoring (accessibles par tous les utilisateurs authentifiés)
+                        // Routes pour le monitoring (authentifiés)
                         .requestMatchers("/api/monitoring/**").authenticated()
                         // Routes pour les notifications
                         .requestMatchers("/api/notifications/**").authenticated()
+                        // Tout le reste nécessite une authentification
                         .anyRequest().authenticated()
                 )
+
+                // 5) Provider + filtre JWT
                 .authenticationProvider(authenticationProvider())
-                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class); // Ajouter le filtre JWT
+                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
@@ -77,44 +92,52 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
+    // ✅ Version recommandée : utiliser CorsConfigurationSource
     @Bean
-    public CorsFilter corsFilter() {
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+    public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        
-        // Permettre les credentials (cookies, authorization headers)
+
+        // Autoriser l'envoi de cookies / headers d'auth (si nécessaire)
         config.setAllowCredentials(true);
-        
-        // Autoriser les origines pour le développement (vous pouvez les restreindre en production)
-        config.addAllowedOriginPattern("*"); // Pour le développement - en production, spécifiez les domaines exacts
-        
-        // Autoriser tous les headers nécessaires
-        config.addAllowedHeader("*");
-        config.addAllowedHeader("Authorization");
-        config.addAllowedHeader("Content-Type");
-        config.addAllowedHeader("X-Requested-With");
-        config.addAllowedHeader("Accept");
-        config.addAllowedHeader("Origin");
-        config.addAllowedHeader("Access-Control-Request-Method");
-        config.addAllowedHeader("Access-Control-Request-Headers");
-        
-        // Autoriser toutes les méthodes HTTP
-        config.addAllowedMethod("GET");
-        config.addAllowedMethod("POST");
-        config.addAllowedMethod("PUT");
-        config.addAllowedMethod("DELETE");
-        config.addAllowedMethod("PATCH");
-        config.addAllowedMethod("OPTIONS");
-        config.addAllowedMethod("HEAD");
-        
-        // Exposer les headers de réponse
-        config.addExposedHeader("Authorization");
-        config.addExposedHeader("Content-Type");
-        
-        // Durée de mise en cache des pré-requêtes OPTIONS
+
+        // Pour le dev : tout autoriser, à restreindre en prod
+        config.setAllowedOriginPatterns(List.of("*"));
+
+        // Headers autorisés
+        config.setAllowedHeaders(Arrays.asList(
+                "Authorization",
+                "Content-Type",
+                "X-Requested-With",
+                "Accept",
+                "Origin",
+                "Access-Control-Request-Method",
+                "Access-Control-Request-Headers"
+        ));
+
+        // Méthodes autorisées
+        config.setAllowedMethods(Arrays.asList(
+                "GET",
+                "POST",
+                "PUT",
+                "DELETE",
+                "PATCH",
+                "OPTIONS",
+                "HEAD"
+        ));
+
+        // Headers exposés
+        config.setExposedHeaders(Arrays.asList(
+                "Authorization",
+                "Content-Type"
+        ));
+
+        // Cache des préflight
         config.setMaxAge(3600L);
-        
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
-        return new CorsFilter(source);
+
+        return source;
     }
+
 }

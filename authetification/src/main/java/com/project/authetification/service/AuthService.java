@@ -6,6 +6,7 @@ import com.project.authetification.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import java.util.stream.Collectors;
 
 import java.util.List;
 import java.util.Optional;
@@ -32,14 +33,18 @@ public class AuthService {
     @Value("${spring.mail.username}") // application.properties
     private String mailFrom;
 
-    public Optional<User> register(String username, String email, String password , String role) {
+    public Optional<User> register(String username, String email, String password ,List<String> roles) {
         if (userRepository.existsByEmail(email)) {
             return Optional.empty();
         }
 
         User newUser = new User();
         newUser.setUsername(username);
-        newUser.setRoles(List.of("ROLE_" + role.toUpperCase()));
+        // Formater les rôles pour commencer par "ROLE_"
+        List<String> formattedRoles = roles.stream()
+                .map(role -> "ROLE_" + role.toUpperCase())
+                .collect(Collectors.toList());
+        newUser.setRoles(formattedRoles);
         newUser.setEmail(email);
         newUser.setPassword(passwordEncoder.encode(password));
 
