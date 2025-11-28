@@ -13,11 +13,11 @@
 	<version>0.0.1-SNAPSHOT</version>
 	<name>authetification</name>
 	<description>my project of springboot</description>
-	
+
 	<properties>
 		<java.version>21</java.version>
 	</properties>
-	
+
 	<dependencies>
 		<!-- Spring Boot Starters -->
 		<dependency>
