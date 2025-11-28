@@ -64,8 +64,8 @@ public class SecurityConfig {
                         // Important : laisser /error public (Spring Boot 3 / Security 6)
                         .requestMatchers("/error").permitAll()
                         // Routes pour les demandeurs
-                        .requestMatchers("/api/demandes/demandeur/create").hasAnyRole("DEMANDEUR", "ADMIN")
-                        .requestMatchers("/api/demandes/demandeur/**").hasAnyRole("DEMANDEUR", "ADMIN")
+                        .requestMatchers("/api/demandes/demandeur/create").hasAnyRole("DEMANDEUR", "ADMIN","EQUIPECLOUD","EQUIPESUPPORT")
+                        .requestMatchers("/api/demandes/demandeur/**").hasAnyRole("DEMANDEUR", "ADMIN","EQUIPECLOUD","EQUIPESUPPORT")
                         // Routes pour l'équipe Cloud
                         .requestMatchers("/api/cloud-team/**").hasAnyRole("EQUIPECLOUD", "ADMIN")
                         // Routes pour l'équipe Support Système

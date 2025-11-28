@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.*;
 
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -83,10 +84,32 @@ public class AuthController {
                     new UsernamePasswordAuthenticationToken(username, password)
             );
 
+            // Retrieve the full user object from the database
+            Optional<User> userOptional = authService.findByUsername(username);
+
+            if (userOptional.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Utilisateur introuvable.");
+            }
+
+            User user = userOptional.get();
             UserDetails userDetails = userDetailsService.loadUserByUsername(username);
             String jwtToken = jwtService.generateToken(userDetails);
 
-            return ResponseEntity.ok(Map.of("message", "Connexion réussie pour l'utilisateur : " + username, "token", jwtToken));
+            // Prepare response with token and user data
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Connexion réussie pour l'utilisateur : " + username);
+            response.put("token", jwtToken);
+
+            // User data (excluding sensitive information like password and reset tokens)
+            Map<String, Object> userData = new HashMap<>();
+            userData.put("id", user.getId());
+            userData.put("username", user.getUsername());
+            userData.put("email", user.getEmail());
+            userData.put("roles", user.getRoles());
+
+            response.put("user", userData);
+
+            return ResponseEntity.ok(response);
 
         } catch (org.springframework.security.authentication.BadCredentialsException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Mot de passe incorrect.");
