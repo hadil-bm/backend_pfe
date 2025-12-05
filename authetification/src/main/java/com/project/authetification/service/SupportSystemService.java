@@ -9,12 +9,15 @@ import com.project.authetification.repository.UserRepository;
 import com.project.authetification.repository.VMRepository;
 import com.project.authetification.repository.WorkOrderRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class SupportSystemService {
@@ -24,7 +27,7 @@ public class SupportSystemService {
     private final VMRepository vmRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
-    private final TerraformService terraformService;
+    private final TerraformLocalService terraformLocalService;
 
     /**
      * Récupère tous les workorders en attente
@@ -80,17 +83,13 @@ public class SupportSystemService {
         workOrder.setDateDebut(LocalDateTime.now());
         workOrder = workOrderRepository.save(workOrder);
 
-        // Déclencher automatiquement Terraform Cloud
+        // Déclencher automatiquement Terraform localement
         try {
-            terraformService.createTerraformRun(workOrderId);
-            notificationService.sendNotification(
-                    workOrder.getAssigne(),
-                    "Terraform démarré",
-                    "Le provisionnement Terraform pour le workorder '" + workOrder.getTitre() + "' a été démarré automatiquement."
-            );
+            terraformLocalService.createVMLocally(workOrderId);
+            log.info("Terraform local démarré pour le workorder: {}", workOrderId);
         } catch (Exception e) {
             // Logger l'erreur mais continuer le processus
-            System.err.println("Erreur lors du démarrage de Terraform: " + e.getMessage());
+            log.error("Erreur lors du démarrage de Terraform local: ", e);
         }
 
         return workOrder;

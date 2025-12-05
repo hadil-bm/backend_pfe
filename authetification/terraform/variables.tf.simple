@@ -1,0 +1,133 @@
+# Variables Terraform simplifiées pour exécution locale
+
+variable "vm_name" {
+  description = "Nom de la machine virtuelle"
+  type        = string
+}
+
+variable "demande_id" {
+  description = "ID de la demande d'origine"
+  type        = string
+}
+
+variable "vm_size" {
+  description = "Taille de la VM Azure"
+  type        = string
+  default     = "Standard_B2s"
+}
+
+variable "image_publisher" {
+  description = "Publisher de l'image Azure"
+  type        = string
+  default     = "Canonical"
+}
+
+variable "image_offer" {
+  description = "Offer de l'image Azure"
+  type        = string
+  default     = "UbuntuServer"
+}
+
+variable "image_sku" {
+  description = "SKU de l'image Azure"
+  type        = string
+  default     = "22.04-LTS"
+}
+
+variable "os_type" {
+  description = "Type de système d'exploitation"
+  type        = string
+  default     = "Ubuntu"
+}
+
+variable "os_version" {
+  description = "Version du système d'exploitation"
+  type        = string
+  default     = "22.04"
+}
+
+variable "cpu_cores" {
+  description = "Nombre de cœurs CPU"
+  type        = number
+  default     = 2
+}
+
+variable "ram_gb" {
+  description = "Quantité de RAM en GB"
+  type        = number
+  default     = 4
+}
+
+variable "disk_size" {
+  description = "Taille du disque en GB"
+  type        = number
+  default     = 30
+}
+
+variable "disk_type" {
+  description = "Type de disque Azure"
+  type        = string
+  default     = "Premium_LRS"
+}
+
+variable "azure_location" {
+  description = "Région Azure"
+  type        = string
+  default     = "West Europe"
+}
+
+variable "environment" {
+  description = "Environnement"
+  type        = string
+  default     = "production"
+}
+
+variable "subnet_id" {
+  description = "ID du subnet Azure (vide si création automatique)"
+  type        = string
+  default     = ""
+}
+
+variable "create_vnet" {
+  description = "Créer un Virtual Network et Subnet"
+  type        = bool
+  default     = true
+}
+
+variable "vnet_address_space" {
+  description = "Espace d'adressage du VNet"
+  type        = string
+  default     = "10.0.0.0/16"
+}
+
+variable "subnet_address_prefix" {
+  description = "Préfixe d'adresse du Subnet"
+  type        = string
+  default     = "10.0.1.0/24"
+}
+
+variable "assign_public_ip" {
+  description = "Assigner une IP publique"
+  type        = bool
+  default     = true
+}
+
+variable "admin_username" {
+  description = "Nom d'utilisateur administrateur"
+  type        = string
+  default     = "azureuser"
+}
+
+variable "admin_password" {
+  description = "Mot de passe administrateur (Windows uniquement)"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "user_data" {
+  description = "Script user-data pour configuration initiale"
+  type        = string
+  default     = ""
+}
+
