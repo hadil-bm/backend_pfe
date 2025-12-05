@@ -11,6 +11,8 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
+                // Force le nettoyage pour être sûr d'avoir la dernière version
+                cleanWs()
                 git branch: 'main',
                     url: 'https://github.com/hadil-bm/backend_pfe.git',
                     credentialsId: 'github-token'
@@ -19,14 +21,12 @@ pipeline {
 
         stage('Build Backend') {
             steps {
-                // CORRECTION ICI : Vérifiez l'orthographe exacte de votre dossier !
-                // J'ai corrigé 'authetification' -> 'authentication' (avec un 'n')
-                dir('authentication') { 
+                // ATTENTION : J'utilise ici votre orthographe exacte "authetification" (sans 'n')
+                dir('authetification') { 
                     sh """
-                        # On liste les fichiers pour être sûr que mvnw est là (pour le debug)
-                        ls -la
-                        
-                        chmod +x mvnw || true
+                        # On rend le wrapper exécutable (juste au cas où)
+                        chmod +x mvnw
+                        # On lance le build
                         ./mvnw clean package -DskipTests
                     """
                 }
@@ -35,8 +35,8 @@ pipeline {
 
         stage('Docker Build') {
             steps {
-                // CORRECTION ICI AUSSI
-                dir('authentication') {
+                // Même chose ici : orthographe exacte du dossier git
+                dir('authetification') {
                     sh """
                         docker build --no-cache -t ${DOCKER_USER}/${BACKEND_IMAGE}:${BUILD_TAG} .
                         docker tag ${DOCKER_USER}/${BACKEND_IMAGE}:${BUILD_TAG} ${DOCKER_USER}/${BACKEND_IMAGE}:latest
@@ -55,7 +55,7 @@ pipeline {
             }
         }
     }
-    
+
     post {
         success { echo "✅ Success!" }
         failure { echo "❌ Failed!" }
