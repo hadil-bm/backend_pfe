@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        DOCKERHUB = credentials('44248ad2-0b55-4dd8-9243-281f38fc118a')   // ID Jenkins
+        DOCKERHUB = credentials('docker-hub-creds')  // ID Jenkins
         DOCKER_USER = "hadilbenmasseoud"
         BACKEND_IMAGE = "backend"
         BUILD_TAG = "${env.BUILD_NUMBER}-${new Date().format('yyyyMMdd-HHmmss')}"
@@ -13,7 +13,7 @@ pipeline {
         /* ======== CLONE BACKEND ======== */
         stage('Checkout') {
             steps {
-                git branch: 'master',
+                git branch: 'main',
                     url: 'https://github.com/hadil-bm/backend_pfe.git',
                     credentialsId: 'github-token'
             }
