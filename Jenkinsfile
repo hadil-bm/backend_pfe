@@ -2,6 +2,10 @@ pipeline {
     agent any
 
     environment {
+        // Force le chemin vers Java 21 (Chemin standard sur Ubuntu)
+        JAVA_HOME = "/usr/lib/jvm/java-21-openjdk-amd64"
+        PATH = "${JAVA_HOME}/bin:${env.PATH}"
+        
         DOCKERHUB = credentials('docker-hub-creds')
         DOCKER_USER = "hadilbenmasseoud"
         BACKEND_IMAGE = "backend"
@@ -11,7 +15,6 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                // Force le nettoyage pour être sûr d'avoir la dernière version
                 cleanWs()
                 git branch: 'main',
                     url: 'https://github.com/hadil-bm/backend_pfe.git',
@@ -21,12 +24,13 @@ pipeline {
 
         stage('Build Backend') {
             steps {
-                // ATTENTION : J'utilise ici votre orthographe exacte "authetification" (sans 'n')
+                // ATTENTION : Orthographe "authetification" comme sur votre GitHub
                 dir('authetification') { 
                     sh """
-                        # On rend le wrapper exécutable (juste au cas où)
+                        # Debug : vérifie la version de Java utilisée
+                        java -version
+                        
                         chmod +x mvnw
-                        # On lance le build
                         ./mvnw clean package -DskipTests
                     """
                 }
@@ -35,7 +39,6 @@ pipeline {
 
         stage('Docker Build') {
             steps {
-                // Même chose ici : orthographe exacte du dossier git
                 dir('authetification') {
                     sh """
                         docker build --no-cache -t ${DOCKER_USER}/${BACKEND_IMAGE}:${BUILD_TAG} .
@@ -55,7 +58,7 @@ pipeline {
             }
         }
     }
-
+    
     post {
         success { echo "✅ Success!" }
         failure { echo "❌ Failed!" }
