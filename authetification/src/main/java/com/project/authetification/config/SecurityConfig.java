@@ -70,6 +70,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/cloud-team/**").hasAnyRole("EQUIPECLOUD", "ADMIN")
                         // Routes pour l'équipe Support Système
                         .requestMatchers("/api/support-system/**").hasAnyRole("EQUIPESUPPORT", "ADMIN")
+                        // Routes pour Terraform (équipe Support uniquement)
+                        .requestMatchers("/api/terraform/**").hasAnyRole("EQUIPESUPPORT", "ADMIN")
                         // Routes pour les administrateurs
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         // Routes pour le monitoring (authentifiés)

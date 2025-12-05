@@ -24,6 +24,7 @@ public class SupportSystemService {
     private final VMRepository vmRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
+    private final TerraformService terraformService;
 
     /**
      * Récupère tous les workorders en attente
@@ -69,6 +70,7 @@ public class SupportSystemService {
 
     /**
      * Démarre le provisionnement d'une VM
+     * Cette méthode déclenche automatiquement Terraform Cloud
      */
     public WorkOrder demarrerProvisionnement(String workOrderId) {
         WorkOrder workOrder = workOrderRepository.findById(workOrderId)
@@ -76,8 +78,22 @@ public class SupportSystemService {
 
         workOrder.setStatus("EN_COURS");
         workOrder.setDateDebut(LocalDateTime.now());
+        workOrder = workOrderRepository.save(workOrder);
 
-        return workOrderRepository.save(workOrder);
+        // Déclencher automatiquement Terraform Cloud
+        try {
+            terraformService.createTerraformRun(workOrderId);
+            notificationService.sendNotification(
+                    workOrder.getAssigne(),
+                    "Terraform démarré",
+                    "Le provisionnement Terraform pour le workorder '" + workOrder.getTitre() + "' a été démarré automatiquement."
+            );
+        } catch (Exception e) {
+            // Logger l'erreur mais continuer le processus
+            System.err.println("Erreur lors du démarrage de Terraform: " + e.getMessage());
+        }
+
+        return workOrder;
     }
 
     /**

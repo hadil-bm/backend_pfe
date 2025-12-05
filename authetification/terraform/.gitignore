@@ -1,0 +1,34 @@
+# Fichiers Terraform à ignorer
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+
+# Fichiers de verrouillage
+.terraform.lock.hcl
+
+# Dossier .terraform
+.terraform/
+
+# Fichiers de crash
+crash.log
+crash.*.log
+
+# Fichiers de plan
+*.tfplan
+*.tfplan.*
+
+# Fichiers de backup
+*.backup
+*.backup.*
+
+# Fichiers override
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Fichiers CLI
+.terraformrc
+terraform.rc
+
