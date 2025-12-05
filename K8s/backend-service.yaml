@@ -4,9 +4,9 @@ metadata:
   name: backend-service
   namespace: dev-namespace
 spec:
-  type: ClusterIP
   selector:
     app: backend
+  type: ClusterIP
   ports:
   - name: http
     port: 8080
