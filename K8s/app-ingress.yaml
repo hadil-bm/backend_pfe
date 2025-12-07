@@ -2,12 +2,13 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: backend-ingress
-  namespace: dev-namespace
+  namespace: default  
   annotations:
-    kubernetes.io/ingress.class: "nginx"
+    # Ma t7ottouch 'ssl-passthrough' houni, 5ater Spring Boot ye5dem HTTP
 spec:
+  ingressClassName: nginx
   rules:
-  - host: api.20.40.145.164.nip.io
+  - host: api.4.251.133.114.nip.io  
     http:
       paths:
       - path: /
