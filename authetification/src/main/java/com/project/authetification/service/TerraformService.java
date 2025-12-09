@@ -18,14 +18,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
-
 @Slf4j
 @Service("vmTerraformService")
 @RequiredArgsConstructor
 public class TerraformService {
-
-    // On a enlevé le Repository car TerraformService ne doit pas toucher à la base directement ici
-    // Il retourne juste le résultat (IP)
 
     @Value("${terraform.vm.working-dir:/home/hadilbenmasseoud/azure-tf-test}")
     private String terraformWorkingDir;
@@ -35,24 +31,14 @@ public class TerraformService {
         log.info(">>> [TerraformService] Start provisioning VM ID: {}", demande.getId());
         
         try {
-            // 1. Write variables
             writeTfVars(demande);
-
-            // 2. Init
             log.info(">>> Executing: terraform init");
             runTerraformCommand(List.of("terraform", "init"));
-
-            // 3. Apply
             log.info(">>> Executing: terraform apply");
             String applyOutput = runTerraformCommand(List.of("terraform", "apply", "-auto-approve"));
-
-            // 4. Get IP
             String ip = fetchPublicIp().orElse("IP_NOT_FOUND");
             log.info(">>> SUCCESS! VM IP: {}", ip);
-
-            // On retourne l'IP pour que l'appelant puisse sauvegarder s'il veut
             return CompletableFuture.completedFuture(ip);
-
         } catch (Exception e) {
             log.error(">>> FAILURE Provisioning for Request {}", demande.getId(), e);
             return CompletableFuture.failedFuture(e);
@@ -61,9 +47,7 @@ public class TerraformService {
 
     private void writeTfVars(DemandeVM demande) throws IOException {
         Path tfVarsPath = Path.of(terraformWorkingDir, "terraform.tfvars");
-        
         String osType = (demande.getOsType() != null) ? demande.getOsType() : "Ubuntu";
-        
         String content = String.format(
             "vm_name = \"vm-%d\"\n" +
             "cpu_cores = %d\n" +
@@ -74,7 +58,6 @@ public class TerraformService {
             demande.getRam(), 
             osType
         );
-
         Files.writeString(tfVarsPath, content, StandardCharsets.UTF_8);
     }
 
@@ -83,11 +66,13 @@ public class TerraformService {
         pb.directory(new File(terraformWorkingDir));
         pb.redirectErrorStream(true);
 
+        // --- ICI C'EST LA PARTIE CORRIGÉE ---
         Map<String, String> env = pb.environment();
-        env.put("ARM_CLIENT_ID", "ed5846ea-b024-47c5-9970-fdefeac351dc");
-        env.put("ARM_CLIENT_SECRET", "J698Q~W2hZ4KaRSWNlSl0zwzdgBRWoWnlbWjObss");
-        env.put("ARM_SUBSCRIPTION_ID", "aad8d067-b9af-4460-bba0-218009aa1031");
-        env.put("ARM_TENANT_ID", "dbd6664d-4eb9-46eb-99d8-5c43ba153c61");
+        env.put("ARM_CLIENT_ID", System.getenv("ARM_CLIENT_ID"));
+        env.put("ARM_CLIENT_SECRET", System.getenv("ARM_CLIENT_SECRET"));
+        env.put("ARM_SUBSCRIPTION_ID", System.getenv("ARM_SUBSCRIPTION_ID"));
+        env.put("ARM_TENANT_ID", System.getenv("ARM_TENANT_ID"));
+        // ------------------------------------
 
         Process process = pb.start();
         StringBuilder output = new StringBuilder();
