@@ -1,5 +1,5 @@
-# Utiliser une image Java légère
-FROM openjdk:17-jdk-slim
+
+FROM eclipse-temurin:17-jdk-jammy
 
 # 1. Installer les dépendances nécessaires (curl, unzip, wget)
 RUN apt-get update && apt-get install -y \
