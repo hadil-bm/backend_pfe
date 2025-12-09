@@ -1,22 +1,34 @@
-# Utilise une image stable
-FROM ghcr.io/cirruslabs/flutter:stable AS build
+# Utiliser une image Java légère
+FROM openjdk:17-jdk-slim
 
-# Configurer le dossier
+# 1. Installer les dépendances nécessaires (curl, unzip, wget)
+RUN apt-get update && apt-get install -y \
+    curl \
+    unzip \
+    gnupg \
+    software-properties-common \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
+# 2. Installer Terraform
+# (On télécharge le binaire directement pour être sûr de la version)
+RUN wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor | tee /usr/share/keyrings/hashicorp-archive-keyring.gpg && \
+    echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/hashicorp.list && \
+    apt-get update && apt-get install -y terraform
+
+# 3. Préparer le dossier de l'application
 WORKDIR /app
 
-# Copier JUSTE les fichiers de dépendances d'abord (Optimisation Cache)
-COPY pubspec.* ./
-RUN flutter pub get
+# 4. Copier le JAR généré par Maven (Assure-toi que le build Maven est fait AVANT le docker build)
+# Le fichier se trouve généralement dans target/
+COPY target/*.jar app.jar
 
-# Copier tout le reste
-COPY . .
+# 5. Copier le dossier Terraform (Code Infrastructure)
+# Pour qu'il soit disponible au runtime dans /app/terraform
+COPY src/main/resources/terraform /app/terraform
 
-# Build Web avec moins de "Workers" pour économiser la RAM
-# --web-renderer html: Parfois plus stable que canvaskit sur petits serveurs
-RUN flutter build web --release --web-renderer html
+# 6. Exposer le port
+EXPOSE 8080
 
-# Stage Nginx
-FROM nginx:alpine
-COPY --from=build /app/build/web /usr/share/nginx/html
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
+# 7. Commande de démarrage
+ENTRYPOINT ["java", "-jar", "app.jar"]
