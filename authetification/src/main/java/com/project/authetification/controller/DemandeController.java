@@ -53,17 +53,35 @@ public class DemandeController {
         return ResponseEntity.ok(mesDemandes);
     }
 
-    @PutMapping("/modifier/{id}")
-    public ResponseEntity<Demande> modifierDemande(@PathVariable String id, @RequestBody Demande demandeDetails) {
+   @PutMapping("/modifier/{id}")
+    public ResponseEntity<Demande> modifierDemande(
+            @PathVariable String id,
+            @RequestBody Demande demandeDetails
+    ) {
         String demandeurUsername = getCurrentUsername();
         if (demandeurUsername == null) {
             return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
         }
+
         try {
-            Demande updatedDemande = demandeService.updateDemande(id, demandeurUsername, demandeDetails);
+            // Check if demande can be modified (only EN_ATTENTE status)
+            Optional<Demande> existingDemande = demandeService.getDemandeById(id);
+            if (existingDemande.isPresent()) {
+                if (!existingDemande.get().getStatus().equals("EN_ATTENTE")
+                        && !existingDemande.get().getStatus().equals("A_MODIFIER")) {
+                    return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                            .body(null); // Can't modify if not in these statuses
+                }
+            }
+
+            Demande updatedDemande = demandeService.updateDemande(
+                    id,
+                    demandeurUsername,
+                    demandeDetails
+            );
             return ResponseEntity.ok(updatedDemande);
         } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null); // Or another appropriate status
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null);
         }
     }
 
