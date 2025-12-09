@@ -1,34 +1,19 @@
 package com.project.authetification.model;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-import lombok.Getter;
+import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.AllArgsConstructor;
 
-@Entity
-@Table(name = "demande_vm")
-@Getter
-@Setter
+// Pas d'@Entity, pas de @Document. Juste un DTO.
+@Data
 @NoArgsConstructor
+@AllArgsConstructor
 public class DemandeVM {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
+    private Long id; // ID numérique pour Terraform (ex: hashcode de l'ID String)
     private int cpu;
     private int ram;
     private String osType;
-
-    @Enumerated(EnumType.STRING)
-    private DemandeStatus status = DemandeStatus.PENDING_CLOUD;
-
+    private DemandeStatus status;
     private String ipAddress;
 }
-

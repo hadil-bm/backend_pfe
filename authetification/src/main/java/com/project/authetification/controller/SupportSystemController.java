@@ -3,6 +3,13 @@ package com.project.authetification.controller;
 import com.project.authetification.model.VM;
 import com.project.authetification.model.WorkOrder;
 import com.project.authetification.service.SupportSystemService;
+// --- 1. ZID IMPORTS HEDHOM ---
+import com.project.authetification.service.TerraformService;
+import com.project.authetification.model.DemandeVM;
+import com.project.authetification.model.DemandeStatus;
+import lombok.extern.slf4j.Slf4j;
+// -----------------------------
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -13,12 +20,16 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j // Zid l'annotation Log
 @RestController
 @RequestMapping("/api/support-system")
 @RequiredArgsConstructor
 public class SupportSystemController {
 
     private final SupportSystemService supportSystemService;
+    // --- 2. ZID INJECTION TERRAFORM ---
+    private final TerraformService terraformService;
+    // ----------------------------------
 
     private String getCurrentUsername() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -102,22 +113,43 @@ public class SupportSystemController {
     }
 
     /**
-     * Crée une VM
+     * Crée une VM (MODIFIÉ POUR DÉCLENCHER TERRAFORM)
      */
     @PostMapping("/workorders/{id}/creer-vm")
-    public ResponseEntity<VM> creerVM(
+    public ResponseEntity<?> creerVM(
             @PathVariable String id,
             @RequestBody Map<String, String> request) {
         try {
             String vmName = request.get("vmName");
             if (vmName == null || vmName.isEmpty()) {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Le nom de la VM est obligatoire");
             }
 
+            log.info(">>> Demande de création VM pour WorkOrder: {}", id);
+
+            // 1. Sauvegarde DB (via Service Métier)
             VM vm = supportSystemService.creerVM(id, vmName);
+
+            // 2. Préparation pour Terraform
+            DemandeVM terraformData = new DemandeVM();
+            // Génération ID numérique pour Terraform
+            terraformData.setId((long) Math.abs(vm.getId().hashCode()));
+            // Conversion des valeurs (4 GB -> 4)
+            terraformData.setCpu(parseInteger(vm.getCpu()));
+            terraformData.setRam(parseInteger(vm.getRam()));
+            terraformData.setOsType(vm.getOs());
+            terraformData.setStatus(DemandeStatus.APPROVED);
+
+            log.info(">>> Lancement Terraform Async...");
+            
+            // 3. Appel Asynchrone à Terraform
+            terraformService.triggerVmCreation(terraformData);
+
             return ResponseEntity.ok(vm);
+            
         } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+            log.error("Erreur Création VM", e);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
         }
     }
 
@@ -198,5 +230,16 @@ public class SupportSystemController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
         }
     }
-}
 
+    // --- Helper pour parser "4 GB" en 4 ---
+    private int parseInteger(String value) {
+        try {
+            if (value == null) return 1;
+            String numbers = value.replaceAll("[^0-9]", "");
+            if (numbers.isEmpty()) return 1;
+            return Integer.parseInt(numbers);
+        } catch (Exception e) {
+            return 1;
+        }
+    }
+}
