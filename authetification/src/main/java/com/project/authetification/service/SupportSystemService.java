@@ -1,14 +1,10 @@
 package com.project.authetification.service;
 
 import com.project.authetification.model.*;
-import com.project.authetification.repository.DemandeRepository;
-import com.project.authetification.repository.UserRepository;
-import com.project.authetification.repository.VMRepository;
-import com.project.authetification.repository.WorkOrderRepository;
+import com.project.authetification.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -21,9 +17,8 @@ public class SupportSystemService {
     private final DemandeRepository demandeRepository;
     private final VMRepository vmRepository;
     private final UserRepository userRepository;
-    private final NotificationService notificationService;
-    // 1. Zid l service Terraform s7i7
-    private final TerraformService terraformService; 
+
+    // --- METHODES DE LECTURE ---
 
     public List<WorkOrder> getWorkOrdersEnAttente() {
         return workOrderRepository.findByStatus("EN_ATTENTE");
@@ -31,110 +26,111 @@ public class SupportSystemService {
 
     public List<WorkOrder> getWorkOrdersByAssigne(String username) {
         User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("User not found: " + username));
+                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé: " + username));
         return workOrderRepository.findByAssigne_Id(user.getId());
     }
 
+    public List<VM> getAllVMs() {
+        return vmRepository.findAll();
+    }
+
+    public List<VM> getVMsByDemande(String demandeId) {
+        return vmRepository.findByDemande_Id(demandeId);
+    }
+
+    // --- METHODES D'ACTION ---
+
     public WorkOrder assignerWorkOrder(String workOrderId, String assigneUsername) {
         WorkOrder workOrder = workOrderRepository.findById(workOrderId)
-                .orElseThrow(() -> new RuntimeException("WorkOrder non trouvé: " + workOrderId));
-
+                .orElseThrow(() -> new RuntimeException("WorkOrder introuvable"));
+        
         User assigne = userRepository.findByUsername(assigneUsername)
-                .orElseThrow(() -> new RuntimeException("User non trouvé: " + assigneUsername));
+                .orElseThrow(() -> new RuntimeException("Utilisateur Support introuvable"));
 
         workOrder.setAssigne(assigne);
         workOrder.setStatus("EN_COURS");
         workOrder.setDateDebut(LocalDateTime.now());
 
-        Demande demande = workOrder.getDemande();
-        if (demande != null) {
-            demande.setAssigneSupport(assigne);
-            demande.setStatus("EN_PROVISIONNEMENT");
-            demande.setDateProvisionnement(LocalDateTime.now());
-            demandeRepository.save(demande);
+        // Met à jour la demande liée
+        if (workOrder.getDemande() != null) {
+            workOrder.getDemande().setAssigneSupport(assigne);
+            demandeRepository.save(workOrder.getDemande());
         }
 
         return workOrderRepository.save(workOrder);
     }
 
-    // ---------------------------------------------------------
-    // C'EST LA METHODE LA PLUS IMPORTANTE (LE DECLENCHEUR)
-    // ---------------------------------------------------------
-    public WorkOrder demarrerProvisionnement(String workOrderId) {
+    public VM creerVM(String workOrderId, String vmName) {
         WorkOrder workOrder = workOrderRepository.findById(workOrderId)
-                .orElseThrow(() -> new RuntimeException("WorkOrder non trouvé: " + workOrderId));
+                .orElseThrow(() -> new RuntimeException("WorkOrder non trouvé"));
 
         Demande demande = workOrder.getDemande();
-        if (demande == null) {
-            throw new RuntimeException("Demande associée au WorkOrder non trouvée !");
+        if (demande == null) throw new RuntimeException("Demande introuvable pour ce WorkOrder");
+
+        // Création de l'objet VM dans la base de données
+        VM vm = new VM();
+        vm.setVmName(vmName);
+        vm.setCpu(demande.getCpu());
+        vm.setRam(demande.getRam());
+        vm.setOs(demande.getOs());
+        
+        // Attention: Vérifie si c'est getDisque() ou getDisk() dans ton modèle Demande
+        // Ici j'ai mis getDisque() car c'est ce que tu as écrit dans ton message
+        if(demande.getDisque() != null) {
+             vm.setDisque(demande.getDisque());
         }
 
-        workOrder.setStatus("EN_COURS");
-        workOrder.setDateDebut(LocalDateTime.now());
-
-        // 2. Préparer les données pour Terraform à partir de l'objet 'Demande'
-        DemandeVM terraformData = new DemandeVM();
-        terraformData.setId((long) Math.abs(demande.getId().hashCode()));
-        terraformData.setCpu(parseInteger(demande.getCpu()));
-        terraformData.setRam(parseInteger(demande.getRam()));
-        terraformData.setOsType(demande.getOs());
+        vm.setStatus("CREATING"); // On met CREATING en attendant Terraform
+        vm.setDemande(demande);
         
-        log.info(">>> Déclenchement de Terraform pour demande ID: {}", demande.getId());
-
-        // 3. Appeler le service Terraform s7i7 (celui avec ProcessBuilder)
-        terraformService.triggerVmCreation(terraformData)
-            .thenAccept(ipAddress -> {
-                // HEDHA CODE YETLança ki Terraform YENJA7
-                log.info("Terraform a terminé avec succès! IP: {}", ipAddress);
-                
-                // On met à jour la demande et on crée la VM dans la base
-                demande.setAdresseIp(ipAddress);
-                demande.setStatus("PROVISIONNEE");
-                demande.setDateCompletion(LocalDateTime.now());
-                demandeRepository.save(demande);
-
-                workOrder.setStatus("COMPLETE");
-                workOrder.setResultat("VM créée avec IP: " + ipAddress);
-                workOrder.setDateCompletion(LocalDateTime.now());
-                workOrderRepository.save(workOrder);
-
-                // Optionnel: Créer un objet VM détaillé aussi
-                VM vm = new VM();
-                vm.setVmName(demande.getName());
-                vm.setDemande(demande);
-                vm.setAdresseIp(ipAddress);
-                vm.setStatus("RUNNING");
-                vmRepository.save(vm);
-                
-                log.info("Base de données mise à jour pour la demande {}", demande.getId());
-            })
-            .exceptionally(ex -> {
-                // HEDHA CODE YETLança ki Terraform YECHLEK (échoue)
-                log.error("Terraform a échoué pour la demande ID: {}", demande.getId(), ex);
-                
-                demande.setStatus("ERROR");
-                demandeRepository.save(demande);
-                
-                workOrder.setStatus("ERREUR");
-                workOrder.setErreur(ex.getMessage());
-                workOrderRepository.save(workOrder);
-                return null;
-            });
-        
-        return workOrderRepository.save(workOrder);
+        return vmRepository.save(vm);
     }
-    
-    // ... Garde les autres méthodes (creerVM, finaliserProvisionnement, etc.) ...
-    // Tu peux garder 'creerVM' pour une création manuelle sans Terraform si tu veux.
-    
-    private int parseInteger(String value) {
-        if (value == null || value.isBlank()) return 1;
-        try {
-            return Integer.parseInt(value.replaceAll("[^0-9]", ""));
-        } catch (NumberFormatException e) {
-            return 1;
+
+    public void updateVmIp(String vmId, String ipAddress) {
+        VM vm = vmRepository.findById(vmId).orElse(null);
+        if (vm != null) {
+            vm.setAdresseIp(ipAddress);
+            vm.setStatus("RUNNING");
+            vmRepository.save(vm);
         }
     }
     
-    // Garde le reste de tes méthodes ici (completerEtape, creerVM, finaliserProvisionnement, etc.)
+    // Autres méthodes nécessaires au controller (finaliser, erreurs, etc.)
+    public WorkOrder demarrerProvisionnement(String id) {
+        WorkOrder wo = workOrderRepository.findById(id).orElseThrow();
+        wo.setStatus("EN_PROVISIONNEMENT");
+        return workOrderRepository.save(wo);
+    }
+
+    public WorkOrder completerEtape(String id, String etape) {
+        WorkOrder wo = workOrderRepository.findById(id).orElseThrow();
+        // Logique simplifiée pour l'exemple
+        wo.setResultat((wo.getResultat() == null ? "" : wo.getResultat()) + "\nÉtape: " + etape);
+        return workOrderRepository.save(wo);
+    }
+
+    public WorkOrder finaliserProvisionnement(String id, String resultat) {
+        WorkOrder wo = workOrderRepository.findById(id).orElseThrow();
+        wo.setStatus("COMPLETE");
+        wo.setResultat(resultat);
+        wo.setDateCompletion(LocalDateTime.now());
+        if(wo.getDemande() != null) {
+            wo.getDemande().setStatus("PROVISIONNEE");
+            demandeRepository.save(wo.getDemande());
+        }
+        return workOrderRepository.save(wo);
+    }
+
+    public WorkOrder marquerErreur(String id, String erreur) {
+        WorkOrder wo = workOrderRepository.findById(id).orElseThrow();
+        wo.setStatus("ERREUR");
+        wo.setErreur(erreur);
+        return workOrderRepository.save(wo);
+    }
+
+    public VM updateVMStatus(String id, String status) {
+        VM vm = vmRepository.findById(id).orElseThrow();
+        vm.setStatus(status);
+        return vmRepository.save(vm);
+    }
 }

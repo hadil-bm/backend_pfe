@@ -16,14 +16,16 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 @Slf4j
-@Service("vmTerraformService")
+@Service
 @RequiredArgsConstructor
 public class TerraformService {
 
-    @Value("${terraform.vm.working-dir:/home/hadilbenmasseoud/azure-tf-test}")
+    // Assure-toi que ce dossier existe dans le conteneur Docker !
+    @Value("${terraform.vm.working-dir:/app/terraform}") 
     private String terraformWorkingDir;
 
     @Async
@@ -31,14 +33,24 @@ public class TerraformService {
         log.info(">>> [TerraformService] Start provisioning VM ID: {}", demande.getId());
         
         try {
+            // 1. Ecrire les variables
             writeTfVars(demande);
+
+            // 2. Init
             log.info(">>> Executing: terraform init");
             runTerraformCommand(List.of("terraform", "init"));
+
+            // 3. Apply
             log.info(">>> Executing: terraform apply");
-            String applyOutput = runTerraformCommand(List.of("terraform", "apply", "-auto-approve"));
+            // -auto-approve est CRUCIAL pour ne pas bloquer
+            runTerraformCommand(List.of("terraform", "apply", "-auto-approve"));
+
+            // 4. Récupérer l'IP
             String ip = fetchPublicIp().orElse("IP_NOT_FOUND");
             log.info(">>> SUCCESS! VM IP: {}", ip);
+            
             return CompletableFuture.completedFuture(ip);
+
         } catch (Exception e) {
             log.error(">>> FAILURE Provisioning for Request {}", demande.getId(), e);
             return CompletableFuture.failedFuture(e);
@@ -46,14 +58,25 @@ public class TerraformService {
     }
 
     private void writeTfVars(DemandeVM demande) throws IOException {
+        // ... (création dossier) ...
+
         Path tfVarsPath = Path.of(terraformWorkingDir, "terraform.tfvars");
         String osType = (demande.getOsType() != null) ? demande.getOsType() : "Ubuntu";
+        
+        // CORRECTION : On envoie toutes les variables requises par variables.tf
         String content = String.format(
             "vm_name = \"vm-%d\"\n" +
+            "demande_id = \"%d\"\n" +  // Ajouté
             "cpu_cores = %d\n" +
             "ram_gb = %d\n" +
-            "os_type = \"%s\"\n",
-            demande.getId(), 
+            "os_type = \"%s\"\n" +
+            "os_version = \"22.04\"\n" + // Valeur par défaut forcée ici
+            "create_vnet = true\n" +    // Pour créer le réseau
+            "admin_username = \"azureuser\"\n" +
+            "ssh_public_key = \"\"\n", // Mettre une clé SSH publique réelle ici si possible
+            
+            demande.getId(),
+            demande.getId(), // demande_id
             demande.getCpu(), 
             demande.getRam(), 
             osType
@@ -66,13 +89,12 @@ public class TerraformService {
         pb.directory(new File(terraformWorkingDir));
         pb.redirectErrorStream(true);
 
-        // --- ICI C'EST LA PARTIE CORRIGÉE ---
+        // Passer les variables d'env pour Azure Login (Service Principal)
         Map<String, String> env = pb.environment();
-        env.put("ARM_CLIENT_ID", System.getenv("ARM_CLIENT_ID"));
-        env.put("ARM_CLIENT_SECRET", System.getenv("ARM_CLIENT_SECRET"));
-        env.put("ARM_SUBSCRIPTION_ID", System.getenv("ARM_SUBSCRIPTION_ID"));
-        env.put("ARM_TENANT_ID", System.getenv("ARM_TENANT_ID"));
-        // ------------------------------------
+        if(System.getenv("ARM_CLIENT_ID") != null) env.put("ARM_CLIENT_ID", System.getenv("ARM_CLIENT_ID"));
+        if(System.getenv("ARM_CLIENT_SECRET") != null) env.put("ARM_CLIENT_SECRET", System.getenv("ARM_CLIENT_SECRET"));
+        if(System.getenv("ARM_SUBSCRIPTION_ID") != null) env.put("ARM_SUBSCRIPTION_ID", System.getenv("ARM_SUBSCRIPTION_ID"));
+        if(System.getenv("ARM_TENANT_ID") != null) env.put("ARM_TENANT_ID", System.getenv("ARM_TENANT_ID"));
 
         Process process = pb.start();
         StringBuilder output = new StringBuilder();
@@ -80,28 +102,28 @@ public class TerraformService {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
             String line;
             while ((line = reader.readLine()) != null) {
-                System.out.println("[Terraform] " + line);
+                log.debug("[TF Output] " + line); // Log en debug pour ne pas polluer
                 output.append(line).append("\n");
             }
         }
 
         int exitCode = process.waitFor();
         if (exitCode != 0) {
-            throw new RuntimeException("Terraform Error (Code " + exitCode + ")");
+            throw new RuntimeException("Terraform Error (Code " + exitCode + ")\nOutput:\n" + output.toString());
         }
 
         return output.toString();
     }
 
-    private java.util.Optional<String> fetchPublicIp() {
+    private Optional<String> fetchPublicIp() {
         try {
             String rawOutput = runTerraformCommand(List.of("terraform", "output", "-raw", "vm_public_ip"));
             if (rawOutput != null && !rawOutput.isBlank() && !rawOutput.contains("No outputs")) {
-                return java.util.Optional.of(rawOutput.trim());
+                return Optional.of(rawOutput.trim());
             }
         } catch (Exception e) {
             log.warn("IP fetch warning: {}", e.getMessage());
         }
-        return java.util.Optional.empty();
+        return Optional.empty();
     }
 }
