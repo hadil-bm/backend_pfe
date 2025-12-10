@@ -14,6 +14,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -24,7 +25,7 @@ import java.util.concurrent.CompletableFuture;
 @RequiredArgsConstructor
 public class TerraformService {
 
-    // Assure-toi que ce dossier existe dans le conteneur Docker !
+    // ✅ CORRECTION : Pointe vers /app/terraform par défaut dans Docker
     @Value("${terraform.vm.working-dir:/app/terraform}") 
     private String terraformWorkingDir;
 
@@ -33,19 +34,22 @@ public class TerraformService {
         log.info(">>> [TerraformService] Start provisioning VM ID: {}", demande.getId());
         
         try {
-            // 1. Ecrire les variables
+            // 1. Ecrire les variables (tfvars)
             writeTfVars(demande);
 
             // 2. Init
-            log.info(">>> Executing: terraform init");
+            log.info(">>> Executing: terraform init in {}", terraformWorkingDir);
             runTerraformCommand(List.of("terraform", "init"));
 
-            // 3. Apply
+            // 3. Plan (Optionnel mais recommandé pour debug, on saute ici pour aller vite)
+            
+            // 4. Apply
             log.info(">>> Executing: terraform apply");
             // -auto-approve est CRUCIAL pour ne pas bloquer
-            runTerraformCommand(List.of("terraform", "apply", "-auto-approve"));
+            // -input=false empêche terraform d'attendre une entrée utilisateur
+            runTerraformCommand(List.of("terraform", "apply", "-auto-approve", "-input=false"));
 
-            // 4. Récupérer l'IP
+            // 5. Récupérer l'IP
             String ip = fetchPublicIp().orElse("IP_NOT_FOUND");
             log.info(">>> SUCCESS! VM IP: {}", ip);
             
@@ -58,39 +62,52 @@ public class TerraformService {
     }
 
     private void writeTfVars(DemandeVM demande) throws IOException {
-        // ... (création dossier) ...
+        // ✅ CORRECTION : On s'assure que le dossier existe
+        Path dirPath = Paths.get(terraformWorkingDir);
+        if (!Files.exists(dirPath)) {
+            Files.createDirectories(dirPath);
+        }
 
-        Path tfVarsPath = Path.of(terraformWorkingDir, "terraform.tfvars");
+        // ✅ CORRECTION : On utilise le chemin du conteneur (/app/terraform/terraform.tfvars)
+        Path tfVarsPath = dirPath.resolve("terraform.tfvars");
+        
         String osType = (demande.getOsType() != null) ? demande.getOsType() : "Ubuntu";
         
-        // CORRECTION : On envoie toutes les variables requises par variables.tf
+        // Construction du contenu du fichier
+        // ⚠️ IMPORTANT : Ces noms de variables (vm_name, resource_group_name...) 
+        // DOIVENT exister dans ton fichier variables.tf sinon ça plantera !
         String content = String.format(
             "vm_name = \"vm-%d\"\n" +
-            "demande_id = \"%d\"\n" +  // Ajouté
+            "demande_id = \"%d\"\n" +
             "cpu_cores = %d\n" +
             "ram_gb = %d\n" +
             "os_type = \"%s\"\n" +
-            "os_version = \"22.04\"\n" + // Valeur par défaut forcée ici
-            "create_vnet = true\n" +    // Pour créer le réseau
+            "os_version = \"22.04\"\n" + 
+            "create_vnet = true\n" +    
             "admin_username = \"azureuser\"\n" +
-            "ssh_public_key = \"\"\n", // Mettre une clé SSH publique réelle ici si possible
+            "ssh_public_key = \"\"\n", // Idéalement, passer une vraie clé SSH ici
             
             demande.getId(),
-            demande.getId(), // demande_id
+            demande.getId(),
             demande.getCpu(), 
             demande.getRam(), 
             osType
         );
+        
+        log.info(">>> Writing terraform.tfvars to: {}", tfVarsPath);
         Files.writeString(tfVarsPath, content, StandardCharsets.UTF_8);
     }
 
     private String runTerraformCommand(List<String> command) throws IOException, InterruptedException {
         ProcessBuilder pb = new ProcessBuilder(command);
+        
+        // ✅ CORRECTION : Exécution dans le dossier /app/terraform
         pb.directory(new File(terraformWorkingDir));
         pb.redirectErrorStream(true);
 
         // Passer les variables d'env pour Azure Login (Service Principal)
         Map<String, String> env = pb.environment();
+        // On passe les credentials s'ils sont présents dans l'env du Pod
         if(System.getenv("ARM_CLIENT_ID") != null) env.put("ARM_CLIENT_ID", System.getenv("ARM_CLIENT_ID"));
         if(System.getenv("ARM_CLIENT_SECRET") != null) env.put("ARM_CLIENT_SECRET", System.getenv("ARM_CLIENT_SECRET"));
         if(System.getenv("ARM_SUBSCRIPTION_ID") != null) env.put("ARM_SUBSCRIPTION_ID", System.getenv("ARM_SUBSCRIPTION_ID"));
@@ -102,7 +119,8 @@ public class TerraformService {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
             String line;
             while ((line = reader.readLine()) != null) {
-                log.debug("[TF Output] " + line); // Log en debug pour ne pas polluer
+                // On loggue tout pour voir ce que Terraform dit
+                log.info("[Terraform] " + line); 
                 output.append(line).append("\n");
             }
         }
