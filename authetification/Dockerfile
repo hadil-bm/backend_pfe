@@ -8,6 +8,7 @@ RUN apt-get update && apt-get install -y \
     gnupg \
     software-properties-common \
     wget \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 # 2. Installer Terraform
@@ -25,12 +26,11 @@ COPY target/*.jar app.jar
 # 5. Créer le dossier terraform dans le conteneur
 RUN mkdir -p /app/terraform
 
-# 6. Copier les fichiers Terraform (Depuis la racine du projet vers /app/terraform)
-# ⚠️ Assure-toi que le dossier "terraform" est bien à côté de ce Dockerfile !
-COPY terraform/ /app/terraform/
+# 6. Copier les fichiers Terraform (CORRECTION ICI : On prend depuis src/main/resources)
+COPY src/main/resources/terraform/ /app/terraform/
 
-# 7. Donner les droits d'exécution (au cas où)
-RUN chmod -R 755 /app/terraform
+# 7. Donner les droits d'exécution et d'écriture (important pour terraform init)
+RUN chmod -R 777 /app/terraform
 
 # 8. Exposer le port
 EXPOSE 8080
