@@ -1,5 +1,4 @@
 output "vm_id" {
-  # Utilisation de 'length' pour éviter les erreurs si la VM n'est pas créée
   value = length(azurerm_linux_virtual_machine.vm) > 0 ? azurerm_linux_virtual_machine.vm[0].id : ""
 }
 
@@ -7,14 +6,13 @@ output "vm_private_ip" {
   value = azurerm_network_interface.vm_nic.private_ip_address
 }
 
+# On renvoie "N/A" car l'IP publique n'existe plus
 output "vm_public_ip" {
   value = "N/A"
-  description = "Aucune IP publique assignée"
 }
 
 output "vm_fqdn" {
   value = "N/A"
-  description = "Aucun FQDN assigné"
 }
 
 output "provisioning_info" {

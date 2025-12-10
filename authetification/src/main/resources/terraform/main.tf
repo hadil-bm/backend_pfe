@@ -1,11 +1,8 @@
 resource "azurerm_resource_group" "vm_rg" {
   name     = "rg-${var.vm_name}-${var.demande_id}"
   location = var.azure_location
-  
   tags = {
     Environment = var.environment
-    ManagedBy   = var.application_name
-    Application = var.application_name
     DemandeID   = var.demande_id
   }
 }
@@ -16,10 +13,6 @@ resource "azurerm_virtual_network" "vm_vnet" {
   address_space       = [var.vnet_address_space]
   location            = azurerm_resource_group.vm_rg.location
   resource_group_name = azurerm_resource_group.vm_rg.name
-  
-  tags = {
-    DemandeID = var.demande_id
-  }
 }
 
 resource "azurerm_subnet" "vm_subnet" {
@@ -49,22 +42,6 @@ resource "azurerm_network_security_group" "vm_nsg" {
       destination_address_prefix = "*"
     }
   }
-  
-  security_rule {
-    name                       = "SSH"
-    priority                   = 1000
-    direction                  = "Inbound"
-    access                     = "Allow"
-    protocol                   = "Tcp"
-    source_port_range          = "*"
-    destination_port_range     = "22"
-    source_address_prefix      = "*"
-    destination_address_prefix = "*"
-  }
-
-  tags = {
-    DemandeID = var.demande_id
-  }
 }
 
 resource "azurerm_network_interface" "vm_nic" {
@@ -76,11 +53,7 @@ resource "azurerm_network_interface" "vm_nic" {
     name                          = "internal"
     subnet_id                     = var.create_vnet ? azurerm_subnet.vm_subnet[0].id : var.subnet_id
     private_ip_address_allocation = "Dynamic"
-    public_ip_address_id          = null 
-  }
-
-  tags = {
-    DemandeID = var.demande_id
+    public_ip_address_id          = null
   }
 }
 
@@ -96,9 +69,7 @@ resource "azurerm_linux_virtual_machine" "vm" {
   location            = azurerm_resource_group.vm_rg.location
   size                = var.vm_size
   admin_username      = var.admin_username
-  network_interface_ids = [
-    azurerm_network_interface.vm_nic.id,
-  ]
+  network_interface_ids = [azurerm_network_interface.vm_nic.id]
 
   admin_ssh_key {
     username   = var.admin_username
@@ -118,13 +89,6 @@ resource "azurerm_linux_virtual_machine" "vm" {
     sku       = var.image_sku
     version   = "latest"
   }
-  
-  # Ligne optionnelle : décommente si tu veux utiliser le script user_data
-  custom_data = var.user_data != "" ? base64encode(var.user_data) : null
 
-  tags = {
-    Name        = var.vm_name
-    Environment = var.environment
-    DemandeID   = var.demande_id
-  }
+  custom_data = var.user_data != "" ? base64encode(var.user_data) : null
 }
