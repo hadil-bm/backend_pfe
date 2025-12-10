@@ -6,7 +6,7 @@
 variable "azure_location" {
   description = "Région Azure où créer la VM"
   type        = string
-  default     = "eastus"
+  default     = "francecentral"
 }
 
 variable "environment" {
