@@ -1,46 +1,39 @@
 output "vm_id" {
-  description = "ID de la VM Azure créée"
-  value       = var.os_type != "Windows" ? azurerm_linux_virtual_machine.vm[0].id : azurerm_windows_virtual_machine.vm_windows[0].id
-}
-
-output "vm_name" {
-  description = "Nom de la VM"
-  value       = var.vm_name
+  value = var.os_type == "Linux" ? azurerm_linux_virtual_machine.vm[0].id : ""
 }
 
 output "vm_private_ip" {
-  description = "Adresse IP privée de la VM"
-  value       = azurerm_network_interface.vm_nic.private_ip_address
+  value = azurerm_network_interface.vm_nic.private_ip_address
 }
 
+# On met une chaine vide ou "N/A" car il n'y a plus d'IP publique
 output "vm_public_ip" {
-  description = "Adresse IP publique de la VM"
-  value       = var.assign_public_ip ? azurerm_public_ip.vm_public_ip[0].ip_address : null
+  value = "N/A"
 }
 
+# Idem pour le FQDN
 output "vm_fqdn" {
-  description = "FQDN de la VM"
-  value       = var.assign_public_ip ? azurerm_public_ip.vm_public_ip[0].fqdn : null
+  value = "N/A"
 }
 
-output "vm_resource_group_name" {
-  description = "Nom du Resource Group"
-  value       = azurerm_resource_group.vm_rg.name
+output "provisioning_info" {
+  value = {
+    vm_name             = var.vm_name
+    resource_group_name = azurerm_resource_group.vm_rg.name
+    vm_id               = var.os_type == "Linux" ? azurerm_linux_virtual_machine.vm[0].id : ""
+    vm_private_ip       = azurerm_network_interface.vm_nic.private_ip_address
+    vm_public_ip        = "N/A"
+  }
 }
 
 output "demande_id" {
-  description = "ID de la demande d'origine"
-  value       = var.demande_id
+  value = var.demande_id
 }
 
-# Output complet pour l'app
-output "provisioning_info" {
-  description = "Informations complètes de provisionnement"
-  value = {
-    vm_id               = var.os_type != "Windows" ? azurerm_linux_virtual_machine.vm[0].id : azurerm_windows_virtual_machine.vm_windows[0].id
-    vm_public_ip        = var.assign_public_ip ? azurerm_public_ip.vm_public_ip[0].ip_address : null
-    vm_private_ip       = azurerm_network_interface.vm_nic.private_ip_address
-    resource_group_name = azurerm_resource_group.vm_rg.name
-    vm_name             = var.vm_name
-  }
+output "vm_name" {
+  value = var.vm_name
+}
+
+output "vm_resource_group_name" {
+  value = azurerm_resource_group.vm_rg.name
 }
