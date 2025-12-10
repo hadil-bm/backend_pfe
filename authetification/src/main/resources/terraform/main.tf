@@ -1,4 +1,3 @@
-# On utilise la variable location partout pour être cohérent
 resource "azurerm_resource_group" "vm_rg" {
   name     = "rg-${var.vm_name}-${var.demande_id}"
   location = var.azure_location
@@ -31,9 +30,6 @@ resource "azurerm_subnet" "vm_subnet" {
   address_prefixes     = [var.subnet_address_prefix]
 }
 
-# --- SUPPRESSION DU BLOC PUBLIC IP ---
-# (L'ancien bloc resource "azurerm_public_ip" "vm_public_ip" est supprimé ici)
-
 resource "azurerm_network_security_group" "vm_nsg" {
   name                = "nsg-${var.vm_name}"
   location            = azurerm_resource_group.vm_rg.location
@@ -54,7 +50,6 @@ resource "azurerm_network_security_group" "vm_nsg" {
     }
   }
   
-  # Règle SSH par défaut (optionnelle si déjà dans firewall_rules)
   security_rule {
     name                       = "SSH"
     priority                   = 1000
@@ -81,7 +76,6 @@ resource "azurerm_network_interface" "vm_nic" {
     name                          = "internal"
     subnet_id                     = var.create_vnet ? azurerm_subnet.vm_subnet[0].id : var.subnet_id
     private_ip_address_allocation = "Dynamic"
-    # ICI : On met null explicitement car on n'a plus d'IP publique
     public_ip_address_id          = null 
   }
 
