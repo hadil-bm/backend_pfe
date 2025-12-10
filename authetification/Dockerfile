@@ -1,4 +1,4 @@
-
+# Utiliser une image Java légère et récente (Ubuntu Jammy)
 FROM eclipse-temurin:17-jdk-jammy
 
 # 1. Installer les dépendances nécessaires (curl, unzip, wget)
@@ -19,16 +19,21 @@ RUN wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor | tee /usr/s
 # 3. Préparer le dossier de l'application
 WORKDIR /app
 
-# 4. Copier le JAR généré par Maven (Assure-toi que le build Maven est fait AVANT le docker build)
-# Le fichier se trouve généralement dans target/
+# 4. Copier le JAR généré par Maven
 COPY target/*.jar app.jar
 
-# 5. Copier le dossier Terraform (Code Infrastructure)
-# Pour qu'il soit disponible au runtime dans /app/terraform
-COPY src/main/resources/terraform /app/terraform
+# 5. Créer le dossier terraform dans le conteneur
+RUN mkdir -p /app/terraform
 
-# 6. Exposer le port
+# 6. Copier les fichiers Terraform (Depuis la racine du projet vers /app/terraform)
+# ⚠️ Assure-toi que le dossier "terraform" est bien à côté de ce Dockerfile !
+COPY terraform/ /app/terraform/
+
+# 7. Donner les droits d'exécution (au cas où)
+RUN chmod -R 755 /app/terraform
+
+# 8. Exposer le port
 EXPOSE 8080
 
-# 7. Commande de démarrage
+# 9. Commande de démarrage
 ENTRYPOINT ["java", "-jar", "app.jar"]
