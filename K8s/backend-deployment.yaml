@@ -21,3 +21,17 @@ spec:
         ports:
         - containerPort: 8080
         imagePullPolicy: Always
+        env:
+          # --- CORRECTION DU CHEMIN ---
+          - name: TERRAFORM_VM_WORKING_DIR
+            value: "/app/terraform"
+
+          # --- IDENTIFIANTS AZURE COMPLETS ---
+          - name: ARM_SUBSCRIPTION_ID
+            value: "aad8d067-b9af-4460-bba0-218009aa1031"
+          - name: ARM_CLIENT_ID
+            value: "ed5846ea-b024-47c5-9970-fdefeac351dc"
+          - name: ARM_CLIENT_SECRET
+            value: "J698Q~W2hZ4KaRSWNlSl0zwzdgBRWoWnlbWjObss"
+          - name: ARM_TENANT_ID
+            value: "dbd6664d-4eb9-46eb-99d8-5c43ba153c61"
