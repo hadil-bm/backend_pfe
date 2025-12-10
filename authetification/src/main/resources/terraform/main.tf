@@ -118,6 +118,9 @@ resource "azurerm_linux_virtual_machine" "vm" {
     sku       = var.image_sku
     version   = "latest"
   }
+  
+  # Ligne optionnelle : décommente si tu veux utiliser le script user_data
+  custom_data = var.user_data != "" ? base64encode(var.user_data) : null
 
   tags = {
     Name        = var.vm_name

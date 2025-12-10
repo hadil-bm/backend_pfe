@@ -1,26 +1,27 @@
 output "vm_id" {
-  value = var.os_type == "Linux" ? azurerm_linux_virtual_machine.vm[0].id : ""
+  # Utilisation de 'length' pour éviter les erreurs si la VM n'est pas créée
+  value = length(azurerm_linux_virtual_machine.vm) > 0 ? azurerm_linux_virtual_machine.vm[0].id : ""
 }
 
 output "vm_private_ip" {
   value = azurerm_network_interface.vm_nic.private_ip_address
 }
 
-# On met une chaine vide ou "N/A" car il n'y a plus d'IP publique
 output "vm_public_ip" {
   value = "N/A"
+  description = "Aucune IP publique assignée"
 }
 
-# Idem pour le FQDN
 output "vm_fqdn" {
   value = "N/A"
+  description = "Aucun FQDN assigné"
 }
 
 output "provisioning_info" {
   value = {
     vm_name             = var.vm_name
     resource_group_name = azurerm_resource_group.vm_rg.name
-    vm_id               = var.os_type == "Linux" ? azurerm_linux_virtual_machine.vm[0].id : ""
+    vm_id               = length(azurerm_linux_virtual_machine.vm) > 0 ? azurerm_linux_virtual_machine.vm[0].id : ""
     vm_private_ip       = azurerm_network_interface.vm_nic.private_ip_address
     vm_public_ip        = "N/A"
   }

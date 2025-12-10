@@ -1,5 +1,5 @@
 variable "azure_location" {
-  default = "francecentral"  # <-- ICI : On force la France
+  default = "francecentral"
 }
 
 variable "environment" {
@@ -91,18 +91,30 @@ variable "subnet_address_prefix" {
   default = "10.0.1.0/24"
 }
 
-variable "assign_public_ip" {
-  default = false  # <-- ICI : IMPORTANT ! On désactive l'IP publique par défaut
-}
-
-variable "firewall_rules" {
-  default = []
-}
-
 variable "enable_monitoring" {
   default = false
 }
 
+# --- VARIABLES CORRIGÉES (SANS DOUBLONS) ---
+
+variable "assign_public_ip" {
+  description = "Faut-il assigner une IP publique ? (Désactivé par défaut)"
+  type        = bool
+  default     = false
+}
+
+variable "firewall_rules" {
+  description = "Liste des règles de pare-feu (ports à ouvrir)"
+  type = list(object({
+    name     = string
+    priority = number
+    port     = number
+  }))
+  default = []
+}
+
 variable "user_data" {
-  default = ""
+  description = "Script de configuration initial (cloud-init)"
+  type        = string
+  default     = ""
 }
