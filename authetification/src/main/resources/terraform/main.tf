@@ -1,3 +1,18 @@
+# --- BLOC PROVIDER (OBLIGATOIRE) ---
+terraform {
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "~> 3.0"
+    }
+  }
+}
+
+provider "azurerm" {
+  features {}
+}
+
+# --- RESSOURCES ---
 resource "azurerm_resource_group" "vm_rg" {
   name     = "rg-${var.vm_name}-${var.demande_id}"
   location = var.azure_location
