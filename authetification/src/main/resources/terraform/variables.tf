@@ -95,16 +95,14 @@ variable "enable_monitoring" {
   default = false
 }
 
-# --- VARIABLES CORRIGÉES (SANS DOUBLONS) ---
-
 variable "assign_public_ip" {
-  description = "Faut-il assigner une IP publique ? (Désactivé par défaut)"
+  description = "Faut-il assigner une IP publique ?"
   type        = bool
   default     = false
 }
 
 variable "firewall_rules" {
-  description = "Liste des règles de pare-feu (ports à ouvrir)"
+  description = "Liste des règles de pare-feu"
   type = list(object({
     name     = string
     priority = number
@@ -114,7 +112,7 @@ variable "firewall_rules" {
 }
 
 variable "user_data" {
-  description = "Script de configuration initial (cloud-init)"
+  description = "Script cloud-init"
   type        = string
   default     = ""
 }

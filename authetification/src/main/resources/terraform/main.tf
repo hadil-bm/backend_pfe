@@ -1,4 +1,3 @@
-# --- BLOC PROVIDER (OBLIGATOIRE) ---
 terraform {
   required_providers {
     azurerm = {
@@ -8,13 +7,10 @@ terraform {
   }
 }
 
+# On ne met PAS les identifiants ici. 
+# Terraform les lira tout seul depuis les variables d'environnement ARM_...
 provider "azurerm" {
   features {}
-  
-  subscription_id = var.subscription_id
-  client_id       = var.client_id
-  client_secret   = var.client_secret
-  tenant_id       = var.tenant_id
 }
 
 # --- RESSOURCES ---
