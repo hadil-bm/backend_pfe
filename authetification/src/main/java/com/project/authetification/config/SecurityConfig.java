@@ -57,6 +57,32 @@ public class SecurityConfig {
             // Pas de session (JWT stateless)
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
+                // 4) Autorisations
+                .authorizeHttpRequests(auth -> auth
+                        // Prometheus endpoint ouvert pour monitoring
+                        .requestMatchers("/actuator/prometheus").permitAll()
+                        // Endpoints publics pour la santé et info
+                        .requestMatchers("/api/health", "/api/info").permitAll()
+                        // Auth endpoints
+                        .requestMatchers("/api/auth/**").permitAll()
+                        // Important pour Spring Boot 3
+                        .requestMatchers("/error").permitAll()
+                        // Routes demandeurs
+                        .requestMatchers("/api/demandes/demandeur/create").hasAnyRole("DEMANDEUR", "ADMIN","EQUIPECLOUD","EQUIPESUPPORT")
+                        .requestMatchers("/api/demandes/demandeur/**").hasAnyRole("DEMANDEUR", "ADMIN","EQUIPECLOUD","EQUIPESUPPORT")
+                        // Routes équipes
+                        .requestMatchers("/api/cloud-team/**").hasAnyRole("EQUIPECLOUD", "ADMIN")
+                        .requestMatchers("/api/support-system/**").hasAnyRole("EQUIPESUPPORT", "ADMIN")
+                        .requestMatchers("/api/terraform/local/**").hasAnyRole("EQUIPESUPPORT", "ADMIN")
+                        .requestMatchers("/api/terraform/**").hasAnyRole("EQUIPESUPPORT", "ADMIN")
+                        .requestMatchers("/api/admin/vms").hasAnyRole("ADMIN", "EQUIPESUPPORT")
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/api/monitoring/**").authenticated()
+                        .requestMatchers("/api/notifications/**").authenticated()
+                        // Tout le reste nécessite authentification
+                        .anyRequest().authenticated()
+                )
+
             // Autorisations
             .authorizeHttpRequests(auth -> auth
                 // Tous les endpoints Actuator ouverts (dont /actuator/prometheus)
