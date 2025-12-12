@@ -63,7 +63,7 @@ pipeline {
             steps {
                 script {
                     def scannerHome = "${SONARQUBE_SCANNER_HOME}"
-                    withSonarQubeEnv('ooredoo') {
+                    withSonarQubeEnv('sonarqube') {
                         sh """
                         ${scannerHome}/bin/sonar-scanner \
                           -Dsonar.projectKey=ooredoo \
