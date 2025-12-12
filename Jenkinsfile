@@ -65,18 +65,19 @@ pipeline {
 
         stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv('sonarqube') {
-                    script {
-                        def scannerHome = tool name: 'sonarqube', type: 'hudson.plugins.sonar.SonarRunnerInstallation'
-                        dir('authetification') {
-                            sh """
-                                ${scannerHome}/bin/sonar-scanner \
-                                  -Dsonar.projectKey=ooredoo \
-                                  -Dsonar.sources=. \
-                                  -Dsonar.java.binaries=target/classes \
-                                  -Dsonar.host.url=${SONARQUBE_URL} \
-                                  -Dsonar.login=${SONARQUBE_TOKEN}
-                            """
+                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                    withCredentials([string(credentialsId: 'sonarqube', variable: 'SONARQUBE_TOKEN')]) {
+                        withSonarQubeEnv('sonarqube') {
+                            dir('authetification') {
+                                sh """
+                                    ${tool name: 'sonarqube', type: 'hudson.plugins.sonar.SonarRunnerInstallation'}/bin/sonar-scanner \
+                                      -Dsonar.projectKey=ooredoo \
+                                      -Dsonar.sources=. \
+                                      -Dsonar.java.binaries=target/classes \
+                                      -Dsonar.host.url=${SONARQUBE_URL} \
+                                      -Dsonar.login=$SONARQUBE_TOKEN
+                                """
+                            }
                         }
                     }
                 }
@@ -85,12 +86,13 @@ pipeline {
 
         stage('OWASP Dependency-Check') {
             steps {
-                withCredentials([string(credentialsId: 'nvd-api-key', variable: 'NVD_API_KEY')]) {
-                    script {
-                        // Utilisation sécurisée de NVD_API_KEY
-                        def additionalArgs = "-o './dependency-check-report' -s './authetification' -f 'ALL' --prettyPrint --nvdApiKey ${env.NVD_API_KEY}"
-                        dependencyCheck additionalArguments: additionalArgs, odcInstallation: 'dependency-check'
-                        dependencyCheckPublisher pattern: 'dependency-check-report/dependency-check-report.xml'
+                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                    withCredentials([string(credentialsId: 'nvd-api-key', variable: 'NVD_API_KEY')]) {
+                        script {
+                            def additionalArgs = "-o './dependency-check-report' -s './authetification' -f 'ALL' --prettyPrint --nvdApiKey ${env.NVD_API_KEY}"
+                            dependencyCheck additionalArguments: additionalArgs, odcInstallation: 'dependency-check'
+                            dependencyCheckPublisher pattern: 'dependency-check-report/dependency-check-report.xml'
+                        }
                     }
                 }
             }
