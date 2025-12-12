@@ -71,6 +71,7 @@ pipeline {
                             ${scannerHome}/bin/sonar-scanner \
                               -Dsonar.projectKey=ooredoo \
                               -Dsonar.sources=. \
+                              -Dsonar.java.binaries=target/classes \
                               -Dsonar.host.url=${SONARQUBE_URL} \
                               -Dsonar.login=${SONARQUBE_TOKEN}
                             """
