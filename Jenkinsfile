@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        // Chemin vers Java 21
+        // Java 21
         JAVA_HOME = "/usr/lib/jvm/java-21-openjdk-amd64"
         PATH = "${JAVA_HOME}/bin:${env.PATH}"
 
@@ -13,8 +13,8 @@ pipeline {
         BUILD_TAG = "${env.BUILD_NUMBER}-${new Date().format('yyyyMMdd-HHmmss')}"
 
         // SonarQube
-        SONARQUBE_URL = "http://48.220.33.106:9000" // Remplacer par ton URL
-        SONARQUBE_TOKEN = credentials('sonarqube') // ID du token Jenkins
+        SONARQUBE_URL = "http://48.220.33.106:9000"  // Remplacer par ton URL SonarQube
+        SONARQUBE_TOKEN = credentials('sonarqube')   // ID du token Jenkins
     }
 
     stages {
@@ -62,16 +62,19 @@ pipeline {
 
         stage('SonarQube Analysis') {
             steps {
-                // Utilisation correcte du plugin SonarQube
                 withSonarQubeEnv('sonarqube') { // Nom du serveur configuré dans Jenkins
-                    dir('authetification') {
-                        sh """
-                        sonar-scanner \
-                          -Dsonar.projectKey=ooredoo \
-                          -Dsonar.sources=. \
-                          -Dsonar.host.url=${SONARQUBE_URL} \
-                          -Dsonar.login=${SONARQUBE_TOKEN}
-                        """
+                    script {
+                        // Récupération du chemin du scanner installé via Jenkins Tools
+                        def scannerHome = tool name: 'SonarScanner', type: 'hudson.plugins.sonar.SonarRunnerInstallation'
+                        dir('authetification') {
+                            sh """
+                            ${scannerHome}/bin/sonar-scanner \
+                              -Dsonar.projectKey=ooredoo \
+                              -Dsonar.sources=. \
+                              -Dsonar.host.url=${SONARQUBE_URL} \
+                              -Dsonar.login=${SONARQUBE_TOKEN}
+                            """
+                        }
                     }
                 }
             }
