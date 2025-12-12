@@ -7,17 +7,15 @@ pipeline {
         PATH = "${JAVA_HOME}/bin:${env.PATH}"
 
         // DockerHub
-        DOCKERHUB = credentials('docker-hub-creds')
         DOCKER_USER = "hadilbenmasseoud"
         BACKEND_IMAGE = "backend"
         BUILD_TAG = "${env.BUILD_NUMBER}-${new Date().format('yyyyMMdd-HHmmss')}"
 
         // SonarQube
         SONARQUBE_URL = "http://48.220.33.106:9000"
-        SONARQUBE_TOKEN = credentials('sonarqube')   
 
         // Nmap
-        NETWORK_TARGET = "192.168.1.0/24"  // Remplacer par le réseau ou l'IP à scanner
+        NETWORK_TARGET = "192.168.1.0/24"  // Remplacer par IP ou réseau à scanner
     }
 
     stages {
@@ -88,32 +86,31 @@ pipeline {
         stage('OWASP Dependency-Check') {
             steps {
                 withCredentials([string(credentialsId: 'nvd-api-key', variable: 'NVD_API_KEY')]) {
-                    dependencyCheck additionalArguments: """
-                        -o './dependency-check-report' \
-                        -s './authetification' \
-                        -f 'ALL' \
-                        --prettyPrint \
-                        --nvdApiKey $NVD_API_KEY
-                    """, odcInstallation: 'dependency-check'
-
-                    dependencyCheckPublisher pattern: 'dependency-check-report/dependency-check-report.xml'
+                    script {
+                        // Utilisation sécurisée de NVD_API_KEY
+                        def additionalArgs = "-o './dependency-check-report' -s './authetification' -f 'ALL' --prettyPrint --nvdApiKey ${env.NVD_API_KEY}"
+                        dependencyCheck additionalArguments: additionalArgs, odcInstallation: 'dependency-check'
+                        dependencyCheckPublisher pattern: 'dependency-check-report/dependency-check-report.xml'
+                    }
                 }
             }
         }
 
         stage('Nmap Network Scan') {
             steps {
-                sh """
-                    # Installer Nmap si nécessaire
-                    if ! command -v nmap &> /dev/null
-                    then
-                        sudo apt-get update && sudo apt-get install -y nmap
-                    fi
+                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                    sh """
+                        # Installer Nmap si nécessaire
+                        if ! command -v nmap &> /dev/null
+                        then
+                            sudo apt-get update && sudo apt-get install -y nmap
+                        fi
 
-                    # Lancer le scan réseau
-                    nmap -sV -oN nmap_scan_result.txt ${NETWORK_TARGET}
-                    echo "✅ Scan Nmap terminé. Résultats dans nmap_scan_result.txt"
-                """
+                        # Lancer le scan réseau
+                        nmap -sV -oN nmap_scan_result.txt ${NETWORK_TARGET}
+                        echo "✅ Scan Nmap terminé. Résultats dans nmap_scan_result.txt"
+                    """
+                }
             }
         }
     }
@@ -121,9 +118,11 @@ pipeline {
     post {
         success {
             echo "✅ Pipeline terminé avec succès !"
+            archiveArtifacts artifacts: 'nmap_scan_result.txt', allowEmptyArchive: true
         }
         failure {
             echo "❌ Pipeline échoué !"
+            archiveArtifacts artifacts: 'nmap_scan_result.txt', allowEmptyArchive: true
         }
     }
 }
