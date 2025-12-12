@@ -112,14 +112,14 @@ pipeline {
         stage('OWASP Dependency-Check') {
             steps {
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                    withCredentials([string(credentialsId: 'nvd-api-key', variable: 'NVD_API_KEY')]) {
+                    withCredentials([string(credentialsId: 'nvd-api-key', variable: 'nvd-api-key')]) {
                         
                         dependencyCheck additionalArguments: """
                             -o './dependency-check-report' \
                             -s './authetification' \
                             --prettyPrint \
                             --format ALL \
-                            --nvdApiKey=${NVD_API_KEY}
+                            --nvdApiKey=${nvd-api-key}
                         """, odcInstallation: 'dependency-check'
 
                         dependencyCheckPublisher pattern: 'dependency-check-report/dependency-check-report.xml'
