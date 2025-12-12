@@ -65,7 +65,7 @@ pipeline {
                 withSonarQubeEnv('sonarqube') { // Nom du serveur configuré dans Jenkins
                     script {
                         // Récupération du chemin du scanner installé via Jenkins Tools
-                        def scannerHome = tool name: 'SonarScanner', type: 'hudson.plugins.sonar.SonarRunnerInstallation'
+                        def scannerHome = tool name: 'sonarqube', type: 'hudson.plugins.sonar.SonarRunnerInstallation'
                         dir('authetification') {
                             sh """
                             ${scannerHome}/bin/sonar-scanner \
