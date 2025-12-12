@@ -2,25 +2,16 @@ pipeline {
     agent any
 
     environment {
-        // Java 21
         JAVA_HOME = "/usr/lib/jvm/java-21-openjdk-amd64"
         PATH = "${JAVA_HOME}/bin:${env.PATH}"
-
-        // DockerHub
         DOCKER_USER = "hadilbenmasseoud"
         BACKEND_IMAGE = "backend"
         BUILD_TAG = "${env.BUILD_NUMBER}-${new Date().format('yyyyMMdd-HHmmss')}"
-
-        // SonarQube
         SONARQUBE_URL = "http://48.220.33.106:9000"
-
-        // Nmap target
         NETWORK_TARGET = "192.168.1.0/24"
     }
 
     stages {
-
-        /* ---------------- CHECKOUT ---------------- */
         stage('Checkout') {
             steps {
                 cleanWs()
@@ -30,7 +21,6 @@ pipeline {
             }
         }
 
-        /* ---------------- BUILD MAVEN ---------------- */
         stage('Build Backend') {
             steps {
                 dir('authetification') {
@@ -43,7 +33,6 @@ pipeline {
             }
         }
 
-        /* ---------------- DOCKER BUILD ---------------- */
         stage('Docker Build') {
             steps {
                 dir('authetification') {
@@ -55,7 +44,6 @@ pipeline {
             }
         }
 
-        /* ---------------- PUSH DOCKERHUB ---------------- */
         stage('Push DockerHub') {
             steps {
                 withCredentials([usernamePassword(credentialsId: 'docker-hub-creds',
@@ -70,28 +58,28 @@ pipeline {
             }
         }
 
-        /* ---------------- SONARQUBE ---------------- */
         stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('sonarqube') {
-                    script {
-                        def scannerHome = tool name: 'sonarqube', type: 'hudson.plugins.sonar.SonarRunnerInstallation'
-                        dir('authetification') {
-                            sh """
-                                ${scannerHome}/bin/sonar-scanner \
-                                  -Dsonar.projectKey=ooredoo \
-                                  -Dsonar.sources=. \
-                                  -Dsonar.java.binaries=target/classes \
-                                  -Dsonar.host.url=${SONARQUBE_URL} \
-                                  -Dsonar.login=$SONAR_AUTH_TOKEN
-                            """
+                    withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_AUTH_TOKEN')]) {
+                        script {
+                            def scannerHome = tool name: 'sonarqube', type: 'hudson.plugins.sonar.SonarRunnerInstallation'
+                            dir('authetification') {
+                                sh """
+                                    ${scannerHome}/bin/sonar-scanner \
+                                      -Dsonar.projectKey=ooredoo \
+                                      -Dsonar.sources=. \
+                                      -Dsonar.java.binaries=target/classes \
+                                      -Dsonar.host.url=${SONARQUBE_URL} \
+                                      -Dsonar.login=$SONAR_AUTH_TOKEN
+                                """
+                            }
                         }
                     }
                 }
             }
         }
 
-        /* ---------------- NMAP NETWORK SCAN (INVERTED FIRST) ---------------- */
         stage('Nmap Network Scan') {
             steps {
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
@@ -100,7 +88,6 @@ pipeline {
                             echo "❌ Nmap n'est pas installé sur l'agent Jenkins."
                             exit 1
                         fi
-
                         nmap -sV -oN nmap_scan_result.txt ${NETWORK_TARGET}
                         echo "✅ Scan Nmap terminé."
                     """
@@ -108,22 +95,23 @@ pipeline {
             }
         }
 
-        /* ---------------- OWASP DEPENDENCY-CHECK (NOW AFTER NMAP) ---------------- */
         stage('OWASP Dependency-Check') {
             steps {
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                    withCredentials([string(credentialsId: 'nvd-api-key', variable: 'nvd-api-key')]) {
-                        
-                        dependencyCheck additionalArguments: """
-                            -o './dependency-check-report' \
-                            -s './authetification' \
-                            --prettyPrint \
-                            --format ALL \
-                            --nvdApiKey=${nvd-api-key}
-                        """, odcInstallation: 'dependency-check'
-
-                        dependencyCheckPublisher pattern: 'dependency-check-report/dependency-check-report.xml'
+                    withCredentials([string(credentialsId: 'nvd-api-key', variable: 'NVD_API_KEY')]) {
+                        sh 'mkdir -p dependency-check-report'
+                        sh """
+                            dependency-check \
+                              --project "MonProjet" \
+                              --scan ./authetification \
+                              --out ./dependency-check-report \
+                              --prettyPrint \
+                              --format ALL \
+                              --nvdApiKey \$NVD_API_KEY
+                        """
+                        sh 'ls -l dependency-check-report'
                     }
+                    dependencyCheckPublisher pattern: 'dependency-check-report/dependency-check-report.xml'
                 }
             }
         }
