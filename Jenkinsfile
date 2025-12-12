@@ -2,18 +2,19 @@ pipeline {
     agent any
 
     environment {
-        // Force le chemin vers Java 21 (Chemin standard sur Ubuntu)
+        // Chemin vers Java 21
         JAVA_HOME = "/usr/lib/jvm/java-21-openjdk-amd64"
         PATH = "${JAVA_HOME}/bin:${env.PATH}"
-        
+
+        // DockerHub
         DOCKERHUB = credentials('docker-hub-creds')
         DOCKER_USER = "hadilbenmasseoud"
         BACKEND_IMAGE = "backend"
         BUILD_TAG = "${env.BUILD_NUMBER}-${new Date().format('yyyyMMdd-HHmmss')}"
 
-        // Variables SonarQube
-        SONARQUBE_URL = "http://48.220.33.106:9000"   // Remplace par ton URL SonarQube
-        SONARQUBE_TOKEN = credentials('sonarqube')   // ID du token stocké dans Jenkins Credentials
+        // SonarQube
+        SONARQUBE_URL = "http://48.220.33.106:9000" // Remplacer par ton URL
+        SONARQUBE_TOKEN = credentials('sonarqube') // ID du token Jenkins
     }
 
     stages {
@@ -28,7 +29,7 @@ pipeline {
 
         stage('Build Backend') {
             steps {
-                dir('authetification') { 
+                dir('authetification') {
                     sh """
                         java -version
                         chmod +x mvnw
@@ -61,11 +62,11 @@ pipeline {
 
         stage('SonarQube Analysis') {
             steps {
-                script {
-                    def scannerHome = "${SONARQUBE_SCANNER_HOME}"
-                    withSonarQubeEnv('sonarqube') {
+                // Utilisation correcte du plugin SonarQube
+                withSonarQubeEnv('sonarqube') { // Nom du serveur configuré dans Jenkins
+                    dir('authetification') {
                         sh """
-                        ${scannerHome}/bin/sonar-scanner \
+                        sonar-scanner \
                           -Dsonar.projectKey=ooredoo \
                           -Dsonar.sources=. \
                           -Dsonar.host.url=${SONARQUBE_URL} \
@@ -76,9 +77,13 @@ pipeline {
             }
         }
     }
-    
+
     post {
-        success { echo "✅ Success!" }
-        failure { echo "❌ Failed!" }
+        success {
+            echo "✅ Pipeline terminé avec succès !"
+        }
+        failure {
+            echo "❌ Pipeline échoué !"
+        }
     }
 }
