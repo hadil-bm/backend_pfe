@@ -72,8 +72,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/support-system/**").hasAnyRole("EQUIPESUPPORT", "ADMIN")
                         .requestMatchers("/api/terraform/local/**").hasAnyRole("EQUIPESUPPORT", "ADMIN")
                         .requestMatchers("/api/terraform/**").hasAnyRole("EQUIPESUPPORT", "ADMIN")
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/admin/vms").hasAnyRole("ADMIN", "EQUIPESUPPORT")
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/monitoring/**").authenticated()
                         .requestMatchers("/api/notifications/**").authenticated()
                         // Tout le reste nécessite authentification
