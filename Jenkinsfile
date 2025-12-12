@@ -108,26 +108,36 @@ pipeline {
             }
         }
 
-        /* ---------------- OWASP DEPENDENCY-CHECK (NOW AFTER NMAP) ---------------- */
         stage('OWASP Dependency-Check') {
-            steps {
-                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                    withCredentials([string(credentialsId: 'nvd-api-key', variable: 'nvd-api-key')]) {
-                        
-                        dependencyCheck additionalArguments: """
-                            -o './dependency-check-report' \
-                            -s './authetification' \
-                            --prettyPrint \
-                            --format ALL \
-                            --nvdApiKey=${nvd-api-key}
-                        """, odcInstallation: 'dependency-check'
+    steps {
+        catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+            // Injection correcte de la clé NVD
+            withCredentials([string(credentialsId: 'nvd-api-key', variable: 'nvd-api-key')]) {
 
-                        dependencyCheckPublisher pattern: 'dependency-check-report/dependency-check-report.xml'
-                    }
-                }
+                // Créer le dossier de sortie
+                sh 'mkdir -p dependency-check-report'
+
+                // Lancer le scan avec la variable correctement échappée pour shell
+                sh """
+                dependency-check \
+                  --project "MonProjet" \
+                  --scan ./authetification \
+                  --out ./dependency-check-report \
+                  --prettyPrint \
+                  --format ALL \
+                  --nvdApiKey \$nvd-api-key
+                """
+
+                // Lister les fichiers générés pour debug
+                sh 'ls -l dependency-check-report'
             }
+
+            // Publier les rapports
+            dependencyCheckPublisher pattern: 'dependency-check-report/dependency-check-report.xml'
         }
     }
+}
+
 
     post {
         success {
