@@ -14,11 +14,13 @@ pipeline {
         // SonarQube
         SONARQUBE_URL = "http://48.220.33.106:9000"
 
-        // Nmap
-        NETWORK_TARGET = "192.168.1.0/24"  // Remplacer par IP ou réseau à scanner
+        // Nmap target
+        NETWORK_TARGET = "192.168.1.0/24"
     }
 
     stages {
+
+        /* ---------------- CHECKOUT ---------------- */
         stage('Checkout') {
             steps {
                 cleanWs()
@@ -28,6 +30,7 @@ pipeline {
             }
         }
 
+        /* ---------------- BUILD MAVEN ---------------- */
         stage('Build Backend') {
             steps {
                 dir('authetification') {
@@ -40,6 +43,7 @@ pipeline {
             }
         }
 
+        /* ---------------- DOCKER BUILD ---------------- */
         stage('Docker Build') {
             steps {
                 dir('authetification') {
@@ -51,9 +55,12 @@ pipeline {
             }
         }
 
+        /* ---------------- PUSH DOCKERHUB ---------------- */
         stage('Push DockerHub') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'docker-hub-creds', usernameVariable: 'DOCKERHUB_USR', passwordVariable: 'DOCKERHUB_PSW')]) {
+                withCredentials([usernamePassword(credentialsId: 'docker-hub-creds',
+                                                  usernameVariable: 'DOCKERHUB_USR',
+                                                  passwordVariable: 'DOCKERHUB_PSW')]) {
                     sh """
                         echo $DOCKERHUB_PSW | docker login -u $DOCKERHUB_USR --password-stdin
                         docker push ${DOCKER_USER}/${BACKEND_IMAGE}:${BUILD_TAG}
@@ -63,56 +70,51 @@ pipeline {
             }
         }
 
+        /* ---------------- SONARQUBE ---------------- */
         stage('SonarQube Analysis') {
             steps {
-                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                    withCredentials([string(credentialsId: 'sonarqube', variable: 'SONARQUBE_TOKEN')]) {
-                        withSonarQubeEnv('sonarqube') {
-                            dir('authetification') {
-                                sh """
-                                    ${tool name: 'sonarqube', type: 'hudson.plugins.sonar.SonarRunnerInstallation'}/bin/sonar-scanner \
-                                      -Dsonar.projectKey=ooredoo \
-                                      -Dsonar.sources=. \
-                                      -Dsonar.java.binaries=target/classes \
-                                      -Dsonar.host.url=${SONARQUBE_URL} \
-                                      -Dsonar.login=$SONARQUBE_TOKEN
-                                """
-                            }
+                withSonarQubeEnv('sonarqube') {
+                    script {
+                        def scannerHome = tool name: 'sonarqube', type: 'hudson.plugins.sonar.SonarRunnerInstallation'
+                        dir('authetification') {
+                            sh """
+                                ${scannerHome}/bin/sonar-scanner \
+                                  -Dsonar.projectKey=ooredoo \
+                                  -Dsonar.sources=. \
+                                  -Dsonar.java.binaries=target/classes \
+                                  -Dsonar.host.url=${SONARQUBE_URL} \
+                                  -Dsonar.login=$SONAR_AUTH_TOKEN
+                            """
                         }
                     }
                 }
             }
         }
 
+        /* ---------------- OWASP DEPENDENCY CHECK ---------------- */
         stage('OWASP Dependency-Check') {
             steps {
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
                     withCredentials([string(credentialsId: 'nvd-api-key', variable: 'NVD_API_KEY')]) {
-                        script {
-                            def additionalArgs = "-o './dependency-check-report' -s './authetification' -f 'ALL' --prettyPrint --nvdApiKey ${env.NVD_API_KEY}"
-                            dependencyCheck additionalArguments: additionalArgs, odcInstallation: 'dependency-check'
-                            dependencyCheckPublisher pattern: 'dependency-check-report/dependency-check-report.xml'
-                        }
+                        
+                        dependencyCheck additionalArguments: """
+                            -o './dependency-check-report' \
+                            -s './authetification' \
+                            --prettyPrint \
+                            --format ALL \
+                            --nvdApiKey=${NVD_API_KEY}
+                        """, odcInstallation: 'dependency-check'
+
+                        dependencyCheckPublisher pattern: 'dependency-check-report/dependency-check-report.xml'
                     }
                 }
             }
         }
 
+        /* ---------------- NMAP NETWORK SCAN ---------------- */
         stage('Nmap Network Scan') {
             steps {
-                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                    sh """
-                        # Installer Nmap si nécessaire
-                        if ! command -v nmap &> /dev/null
-                        then
-                            sudo apt-get update && sudo apt-get install -y nmap
-                        fi
-
-                        # Lancer le scan réseau
-                        nmap -sV -oN nmap_scan_result.txt ${NETWORK_TARGET}
-                        echo "✅ Scan Nmap terminé. Résultats dans nmap_scan_result.txt"
-                    """
-                }
+                sh "nmap -st -p 80,443,90 app.4.251.133.114.nip.io"
             }
         }
     }
@@ -121,10 +123,10 @@ pipeline {
         success {
             echo "✅ Pipeline terminé avec succès !"
             archiveArtifacts artifacts: 'nmap_scan_result.txt', allowEmptyArchive: true
+            archiveArtifacts artifacts: 'dependency-check-report/*', allowEmptyArchive: true
         }
         failure {
             echo "❌ Pipeline échoué !"
-            archiveArtifacts artifacts: 'nmap_scan_result.txt', allowEmptyArchive: true
         }
     }
 }
