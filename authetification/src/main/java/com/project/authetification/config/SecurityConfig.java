@@ -16,7 +16,6 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.web.filter.CorsFilter;
 
 import java.util.Arrays;
 import java.util.List;
@@ -49,7 +48,7 @@ public class SecurityConfig {
                 // 1) API REST stateless + JWT : on désactive CSRF
                 .csrf(csrf -> csrf.disable())
 
-                // 2) On branche explicitement notre configuration CORS
+                // 2) Configuration CORS
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
 
                 // 3) Pas de session (JWT stateless)
@@ -57,30 +56,26 @@ public class SecurityConfig {
 
                 // 4) Autorisations
                 .authorizeHttpRequests(auth -> auth
-                        // Endpoints publics pour la santé et les infos
+                        // Prometheus endpoint ouvert pour monitoring
+                        .requestMatchers("/actuator/prometheus").permitAll()
+                        // Endpoints publics pour la santé et info
                         .requestMatchers("/api/health", "/api/info").permitAll()
-                        // Endpoints d'authentification publics (login, register, etc.)
+                        // Auth endpoints
                         .requestMatchers("/api/auth/**").permitAll()
-                        // Important : laisser /error public (Spring Boot 3 / Security 6)
+                        // Important pour Spring Boot 3
                         .requestMatchers("/error").permitAll()
-                        // Routes pour les demandeurs
+                        // Routes demandeurs
                         .requestMatchers("/api/demandes/demandeur/create").hasAnyRole("DEMANDEUR", "ADMIN","EQUIPECLOUD","EQUIPESUPPORT")
                         .requestMatchers("/api/demandes/demandeur/**").hasAnyRole("DEMANDEUR", "ADMIN","EQUIPECLOUD","EQUIPESUPPORT")
-                        // Routes pour l'équipe Cloud
+                        // Routes équipes
                         .requestMatchers("/api/cloud-team/**").hasAnyRole("EQUIPECLOUD", "ADMIN")
-                        // Routes pour l'équipe Support Système
                         .requestMatchers("/api/support-system/**").hasAnyRole("EQUIPESUPPORT", "ADMIN")
-                        // Routes pour Terraform local (équipe Support uniquement)
                         .requestMatchers("/api/terraform/local/**").hasAnyRole("EQUIPESUPPORT", "ADMIN")
-                        // Routes pour Terraform Cloud (désactivé, on utilise Terraform local)
                         .requestMatchers("/api/terraform/**").hasAnyRole("EQUIPESUPPORT", "ADMIN")
-                        // Routes pour les administrateurs
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        // Routes pour le monitoring (authentifiés)
                         .requestMatchers("/api/monitoring/**").authenticated()
-                        // Routes pour les notifications
                         .requestMatchers("/api/notifications/**").authenticated()
-                        // Tout le reste nécessite une authentification
+                        // Tout le reste nécessite authentification
                         .anyRequest().authenticated()
                 )
 
@@ -96,52 +91,23 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
-    // ✅ Version recommandée : utiliser CorsConfigurationSource
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-
-        // Autoriser l'envoi de cookies / headers d'auth (si nécessaire)
         config.setAllowCredentials(true);
-
-        // Pour le dev : tout autoriser, à restreindre en prod
         config.setAllowedOriginPatterns(List.of("*"));
-
-        // Headers autorisés
         config.setAllowedHeaders(Arrays.asList(
-                "Authorization",
-                "Content-Type",
-                "X-Requested-With",
-                "Accept",
-                "Origin",
-                "Access-Control-Request-Method",
-                "Access-Control-Request-Headers"
+                "Authorization", "Content-Type", "X-Requested-With", "Accept", "Origin",
+                "Access-Control-Request-Method", "Access-Control-Request-Headers"
         ));
-
-        // Méthodes autorisées
         config.setAllowedMethods(Arrays.asList(
-                "GET",
-                "POST",
-                "PUT",
-                "DELETE",
-                "PATCH",
-                "OPTIONS",
-                "HEAD"
+                "GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"
         ));
-
-        // Headers exposés
-        config.setExposedHeaders(Arrays.asList(
-                "Authorization",
-                "Content-Type"
-        ));
-
-        // Cache des préflight
+        config.setExposedHeaders(Arrays.asList("Authorization", "Content-Type"));
         config.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
-
         return source;
     }
-
 }
