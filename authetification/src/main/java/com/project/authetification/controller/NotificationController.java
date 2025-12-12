@@ -10,6 +10,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/notifications")
@@ -36,14 +37,17 @@ public class NotificationController {
         return ResponseEntity.ok(notifications);
     }
 
+    // ✅ FIX: Return JSON object instead of plain number
     @GetMapping("/unread/count")
-    public ResponseEntity<Long> getUnreadNotificationsCount() {
+    public ResponseEntity<Map<String, Long>> getUnreadNotificationsCount() {
         String username = getCurrentUsername();
         if (username == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
         long count = notificationService.getUnreadNotificationsCount(username);
-        return ResponseEntity.ok(count);
+
+        // Return JSON: {"count": 1}
+        return ResponseEntity.ok(Map.of("count", count));
     }
 
     @PutMapping("/mark-as-read/{id}")
