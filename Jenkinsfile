@@ -13,8 +13,11 @@ pipeline {
         BUILD_TAG = "${env.BUILD_NUMBER}-${new Date().format('yyyyMMdd-HHmmss')}"
 
         // SonarQube
-        SONARQUBE_URL = "http://48.220.33.106:9000"  // Remplacer par ton URL SonarQube
-        SONARQUBE_TOKEN = credentials('sonarqube')   // ID du token Jenkins
+        SONARQUBE_URL = "http://48.220.33.106:9000"
+        SONARQUBE_TOKEN = credentials('sonarqube')   
+
+        // Nmap
+        NETWORK_TARGET = "192.168.1.0/24"  // Remplacer par le réseau ou l'IP à scanner
     }
 
     stages {
@@ -52,32 +55,65 @@ pipeline {
 
         stage('Push DockerHub') {
             steps {
-                sh """
-                    echo ${DOCKERHUB_PSW} | docker login -u ${DOCKERHUB_USR} --password-stdin
-                    docker push ${DOCKER_USER}/${BACKEND_IMAGE}:${BUILD_TAG}
-                    docker push ${DOCKER_USER}/${BACKEND_IMAGE}:latest
-                """
+                withCredentials([usernamePassword(credentialsId: 'docker-hub-creds', usernameVariable: 'DOCKERHUB_USR', passwordVariable: 'DOCKERHUB_PSW')]) {
+                    sh """
+                        echo $DOCKERHUB_PSW | docker login -u $DOCKERHUB_USR --password-stdin
+                        docker push ${DOCKER_USER}/${BACKEND_IMAGE}:${BUILD_TAG}
+                        docker push ${DOCKER_USER}/${BACKEND_IMAGE}:latest
+                    """
+                }
             }
         }
 
         stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv('sonarqube') { // Nom du serveur configuré dans Jenkins
+                withSonarQubeEnv('sonarqube') {
                     script {
-                        // Récupération du chemin du scanner installé via Jenkins Tools
                         def scannerHome = tool name: 'sonarqube', type: 'hudson.plugins.sonar.SonarRunnerInstallation'
                         dir('authetification') {
                             sh """
-                            ${scannerHome}/bin/sonar-scanner \
-                              -Dsonar.projectKey=ooredoo \
-                              -Dsonar.sources=. \
-                              -Dsonar.java.binaries=target/classes \
-                              -Dsonar.host.url=${SONARQUBE_URL} \
-                              -Dsonar.login=${SONARQUBE_TOKEN}
+                                ${scannerHome}/bin/sonar-scanner \
+                                  -Dsonar.projectKey=ooredoo \
+                                  -Dsonar.sources=. \
+                                  -Dsonar.java.binaries=target/classes \
+                                  -Dsonar.host.url=${SONARQUBE_URL} \
+                                  -Dsonar.login=${SONARQUBE_TOKEN}
                             """
                         }
                     }
                 }
+            }
+        }
+
+        stage('OWASP Dependency-Check') {
+            steps {
+                withCredentials([string(credentialsId: 'nvd-api-key', variable: 'NVD_API_KEY')]) {
+                    dependencyCheck additionalArguments: """
+                        -o './dependency-check-report' \
+                        -s './authetification' \
+                        -f 'ALL' \
+                        --prettyPrint \
+                        --nvdApiKey $NVD_API_KEY
+                    """, odcInstallation: 'dependency-check'
+
+                    dependencyCheckPublisher pattern: 'dependency-check-report/dependency-check-report.xml'
+                }
+            }
+        }
+
+        stage('Nmap Network Scan') {
+            steps {
+                sh """
+                    # Installer Nmap si nécessaire
+                    if ! command -v nmap &> /dev/null
+                    then
+                        sudo apt-get update && sudo apt-get install -y nmap
+                    fi
+
+                    # Lancer le scan réseau
+                    nmap -sV -oN nmap_scan_result.txt ${NETWORK_TARGET}
+                    echo "✅ Scan Nmap terminé. Résultats dans nmap_scan_result.txt"
+                """
             }
         }
     }
