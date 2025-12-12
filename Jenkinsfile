@@ -107,6 +107,14 @@ pipeline {
                 }
             }
         }
+        stage('Checkout') {
+    steps {
+        cleanWs()
+        git branch: 'main',
+            url: 'https://github.com/hadil-bm/backend_pfe.git',
+            credentialsId: 'github-token'
+    }
+}
 
         /* ---------------- OWASP DEPENDENCY-CHECK ---------------- */
         stage('OWASP Dependency-Check') {
@@ -130,6 +138,7 @@ pipeline {
             }
         }
     }
+    
 
     post {
         success {
