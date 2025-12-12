@@ -57,6 +57,23 @@ pipeline {
                 """
             }
         }
+        
+        stage('SonarQube Analysis') {
+            environment {
+                SCANNER_HOME = tool 'ooredoo'
+            }
+            steps {
+                dir('authetification') {
+                    withSonarQubeEnv('ooredoo') {
+                        sh """
+                            ./mvnw sonar:sonar \
+                              -Dsonar.projectKey=backend-authetification \
+                              -Dsonar.projectName=backend-authetification
+                        """
+                    }
+                }
+            }
+        }
     }
     
     post {

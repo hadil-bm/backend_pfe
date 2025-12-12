@@ -7,13 +7,12 @@ terraform {
   }
 }
 
-# On ne met PAS les identifiants ici. 
-# Terraform les lira tout seul depuis les variables d'environnement ARM_...
 provider "azurerm" {
   features {}
 }
 
 # --- RESSOURCES ---
+
 resource "azurerm_resource_group" "vm_rg" {
   name     = "rg-${var.vm_name}-${var.demande_id}"
   location = var.azure_location
@@ -107,4 +106,19 @@ resource "azurerm_linux_virtual_machine" "vm" {
   }
 
   custom_data = var.user_data != "" ? base64encode(var.user_data) : null
+}
+
+# --- EXTENSION DE MONITORING (AJOUTÉE ICI) ---
+resource "azurerm_virtual_machine_extension" "monitor_agent" {
+  count                      = var.enable_monitoring ? 1 : 0
+  name                       = "AzureMonitorLinuxAgent"
+  virtual_machine_id         = azurerm_linux_virtual_machine.vm[0].id
+  publisher                  = "Microsoft.Azure.Monitor"
+  type                       = "AzureMonitorLinuxAgent"
+  type_handler_version       = "1.0"
+  auto_upgrade_minor_version = true
+  
+  tags = {
+    DemandeID = var.demande_id
+  }
 }

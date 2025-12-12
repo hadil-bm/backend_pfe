@@ -92,7 +92,7 @@ variable "subnet_address_prefix" {
 }
 
 variable "enable_monitoring" {
-  default = false
+  default = true
 }
 
 variable "assign_public_ip" {
