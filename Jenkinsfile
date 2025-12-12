@@ -12,8 +12,8 @@ pipeline {
         BUILD_TAG = "${env.BUILD_NUMBER}-${new Date().format('yyyyMMdd-HHmmss')}"
 
         // Variables SonarQube
-        SONARQUBE_URL = "http://ton-serveur-sonarqube:9000"   // Remplace par ton URL SonarQube
-        SONARQUBE_TOKEN = credentials('sonarqube-token-id')   // ID du token stocké dans Jenkins Credentials
+        SONARQUBE_URL = "http://48.220.33.106:9000"   // Remplace par ton URL SonarQube
+        SONARQUBE_TOKEN = credentials('sonarqube')   // ID du token stocké dans Jenkins Credentials
     }
 
     stages {
