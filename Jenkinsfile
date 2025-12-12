@@ -91,7 +91,24 @@ pipeline {
             }
         }
 
-        /* ---------------- OWASP DEPENDENCY CHECK ---------------- */
+        /* ---------------- NMAP NETWORK SCAN (INVERTED FIRST) ---------------- */
+        stage('Nmap Network Scan') {
+            steps {
+                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                    sh """
+                        if ! command -v nmap >/dev/null 2>&1; then
+                            echo "❌ Nmap n'est pas installé sur l'agent Jenkins."
+                            exit 1
+                        fi
+
+                        nmap -sV -oN nmap_scan_result.txt ${NETWORK_TARGET}
+                        echo "✅ Scan Nmap terminé."
+                    """
+                }
+            }
+        }
+
+        /* ---------------- OWASP DEPENDENCY-CHECK (NOW AFTER NMAP) ---------------- */
         stage('OWASP Dependency-Check') {
             steps {
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
@@ -108,13 +125,6 @@ pipeline {
                         dependencyCheckPublisher pattern: 'dependency-check-report/dependency-check-report.xml'
                     }
                 }
-            }
-        }
-
-        /* ---------------- NMAP NETWORK SCAN ---------------- */
-        stage('Nmap Network Scan') {
-            steps {
-                sh "nmap -st -p 80,443,90 app.4.251.133.114.nip.io"
             }
         }
     }
