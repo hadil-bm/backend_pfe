@@ -10,6 +10,10 @@ pipeline {
         DOCKER_USER = "hadilbenmasseoud"
         BACKEND_IMAGE = "backend"
         BUILD_TAG = "${env.BUILD_NUMBER}-${new Date().format('yyyyMMdd-HHmmss')}"
+
+        // Variables SonarQube
+        SONARQUBE_URL = "http://ton-serveur-sonarqube:9000"   // Remplace par ton URL SonarQube
+        SONARQUBE_TOKEN = credentials('sonarqube-token-id')   // ID du token stocké dans Jenkins Credentials
     }
 
     stages {
@@ -24,12 +28,9 @@ pipeline {
 
         stage('Build Backend') {
             steps {
-                // ATTENTION : Orthographe "authetification" comme sur votre GitHub
                 dir('authetification') { 
                     sh """
-                        # Debug : vérifie la version de Java utilisée
                         java -version
-                        
                         chmod +x mvnw
                         ./mvnw clean package -DskipTests
                     """
@@ -57,18 +58,18 @@ pipeline {
                 """
             }
         }
-        
+
         stage('SonarQube Analysis') {
-            environment {
-                SCANNER_HOME = tool 'ooredoo'
-            }
             steps {
-                dir('authetification') {
+                script {
+                    def scannerHome = "${SONARQUBE_SCANNER_HOME}"
                     withSonarQubeEnv('ooredoo') {
                         sh """
-                            ./mvnw sonar:sonar \
-                              -Dsonar.projectKey=backend-authetification \
-                              -Dsonar.projectName=backend-authetification
+                        ${scannerHome}/bin/sonar-scanner \
+                          -Dsonar.projectKey=ooredoo \
+                          -Dsonar.sources=. \
+                          -Dsonar.host.url=${SONARQUBE_URL} \
+                          -Dsonar.login=${SONARQUBE_TOKEN}
                         """
                     }
                 }
