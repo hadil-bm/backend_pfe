@@ -45,14 +45,17 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                // 1) API REST stateless + JWT : on désactive CSRF
-                .csrf(csrf -> csrf.disable())
+            // API REST stateless + JWT : CSRF désactivé sauf pour les endpoints non-API
+            .csrf(csrf -> csrf
+                .ignoringRequestMatchers("/actuator/**") // important pour Actuator/Prometheus
+                .disable()
+            )
 
-                // 2) Configuration CORS
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            // CORS global
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
 
-                // 3) Pas de session (JWT stateless)
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            // Pas de session (JWT stateless)
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
                 // 4) Autorisations
                 .authorizeHttpRequests(auth -> auth
@@ -80,9 +83,40 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
 
-                // 5) Provider + filtre JWT
-                .authenticationProvider(authenticationProvider())
-                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+            // Autorisations
+            .authorizeHttpRequests(auth -> auth
+                // Tous les endpoints Actuator ouverts (dont /actuator/prometheus)
+                .requestMatchers("/actuator/**").permitAll()
+                // Endpoints publics pour la santé et info API
+                .requestMatchers("/api/health", "/api/info").permitAll()
+                // Auth endpoints
+                .requestMatchers("/api/auth/**").permitAll()
+                // Important pour Spring Boot 3
+                .requestMatchers("/error").permitAll()
+
+                // Routes demandeurs
+                .requestMatchers("/api/demandes/demandeur/create")
+                    .hasAnyRole("DEMANDEUR", "ADMIN","EQUIPECLOUD","EQUIPESUPPORT")
+                .requestMatchers("/api/demandes/demandeur/**")
+                    .hasAnyRole("DEMANDEUR", "ADMIN","EQUIPECLOUD","EQUIPESUPPORT")
+
+                // Routes équipes
+                .requestMatchers("/api/cloud-team/**").hasAnyRole("EQUIPECLOUD", "ADMIN")
+                .requestMatchers("/api/support-system/**").hasAnyRole("EQUIPESUPPORT", "ADMIN")
+                .requestMatchers("/api/terraform/local/**").hasAnyRole("EQUIPESUPPORT", "ADMIN")
+                .requestMatchers("/api/terraform/**").hasAnyRole("EQUIPESUPPORT", "ADMIN")
+                .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                .requestMatchers("/api/admin/vms").hasAnyRole("ADMIN", "EQUIPESUPPORT")
+                .requestMatchers("/api/monitoring/**").authenticated()
+                .requestMatchers("/api/notifications/**").authenticated()
+
+                // Tout le reste nécessite authentification
+                .anyRequest().authenticated()
+            )
+
+            // Provider + filtre JWT
+            .authenticationProvider(authenticationProvider())
+            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
@@ -98,11 +132,11 @@ public class SecurityConfig {
         config.setAllowCredentials(true);
         config.setAllowedOriginPatterns(List.of("*"));
         config.setAllowedHeaders(Arrays.asList(
-                "Authorization", "Content-Type", "X-Requested-With", "Accept", "Origin",
-                "Access-Control-Request-Method", "Access-Control-Request-Headers"
+            "Authorization", "Content-Type", "X-Requested-With", "Accept", "Origin",
+            "Access-Control-Request-Method", "Access-Control-Request-Headers"
         ));
         config.setAllowedMethods(Arrays.asList(
-                "GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"
+            "GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"
         ));
         config.setExposedHeaders(Arrays.asList("Authorization", "Content-Type"));
         config.setMaxAge(3600L);

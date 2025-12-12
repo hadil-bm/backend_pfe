@@ -2,16 +2,24 @@ pipeline {
     agent any
 
     environment {
+        // Java
         JAVA_HOME = "/usr/lib/jvm/java-21-openjdk-amd64"
         PATH = "${JAVA_HOME}/bin:${env.PATH}"
+
+        // Docker
         DOCKER_USER = "hadilbenmasseoud"
         BACKEND_IMAGE = "backend"
         BUILD_TAG = "${env.BUILD_NUMBER}-${new Date().format('yyyyMMdd-HHmmss')}"
+
+        // SonarQube
         SONARQUBE_URL = "http://48.220.33.106:9000"
+
+        // Nmap
         NETWORK_TARGET = "192.168.1.0/24"
     }
 
     stages {
+        /* ---------------- CHECKOUT ---------------- */
         stage('Checkout') {
             steps {
                 cleanWs()
@@ -21,6 +29,7 @@ pipeline {
             }
         }
 
+        /* ---------------- BUILD MAVEN ---------------- */
         stage('Build Backend') {
             steps {
                 dir('authetification') {
@@ -33,6 +42,7 @@ pipeline {
             }
         }
 
+        /* ---------------- DOCKER BUILD ---------------- */
         stage('Docker Build') {
             steps {
                 dir('authetification') {
@@ -44,6 +54,7 @@ pipeline {
             }
         }
 
+        /* ---------------- PUSH DOCKERHUB ---------------- */
         stage('Push DockerHub') {
             steps {
                 withCredentials([usernamePassword(credentialsId: 'docker-hub-creds',
@@ -58,10 +69,11 @@ pipeline {
             }
         }
 
+        /* ---------------- SONARQUBE ---------------- */
         stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('sonarqube') {
-                    withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_AUTH_TOKEN')]) {
+                    withCredentials([string(credentialsId: 'sonarqube', variable: 'SONAR_AUTH_TOKEN')]) {
                         script {
                             def scannerHome = tool name: 'sonarqube', type: 'hudson.plugins.sonar.SonarRunnerInstallation'
                             dir('authetification') {
@@ -80,6 +92,7 @@ pipeline {
             }
         }
 
+        /* ---------------- NMAP NETWORK SCAN ---------------- */
         stage('Nmap Network Scan') {
             steps {
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
@@ -95,6 +108,7 @@ pipeline {
             }
         }
 
+        /* ---------------- OWASP DEPENDENCY-CHECK ---------------- */
         stage('OWASP Dependency-Check') {
             steps {
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
