@@ -33,7 +33,7 @@ public class MonitoringService {
             .credential(new DefaultAzureCredentialBuilder().build())
             .buildClient();
 
-    // Ton ID de souscription (récupéré de tes logs précédents)
+    // Ton ID de souscription
     private final String SUBSCRIPTION_ID = "aad8d067-b9af-4460-bba0-218009aa1031";
 
     /**
@@ -42,21 +42,21 @@ public class MonitoringService {
     @Scheduled(fixedRate = 300000)
     public void fetchMetricsFromAzureTask() {
         log.info(">>> Début de la collecte automatique des métriques Azure...");
-        
+
         List<VM> allVms = vmRepository.findAll();
 
         for (VM vm : allVms) {
-            // On ne monitore que les VMs qui sont censées être RUNNING
+            // On ne monitore que les VMs RUNNING
             if ("RUNNING".equalsIgnoreCase(vm.getStatus())) {
                 try {
                     String resourceId = constructResourceId(vm);
                     log.debug("Interrogation Azure pour VM: {}", vm.getVmName());
 
                     Map<String, Object> azureData = queryAzureMetrics(resourceId);
-                    
+
                     // Sauvegarde en base
                     collectMetrics(vm.getId(), "AzureMonitor", azureData);
-                    
+
                 } catch (Exception e) {
                     log.error("Erreur monitoring pour la VM {}: {}", vm.getVmName(), e.getMessage());
                 }
@@ -74,36 +74,31 @@ public class MonitoringService {
             // On demande le % CPU et le Réseau (Entrant/Sortant)
             MetricsQueryResult result = metricsClient.queryResource(
                 resourceId,
-                Arrays.asList("Percentage CPU", "Network In", "Network Out", "Disk Read Bytes", "Disk Write Bytes"), 
-                null
+                Arrays.asList("Percentage CPU", "Network In", "Network Out", "Disk Read Bytes", "Disk Write Bytes")
             );
 
             for (MetricResult metric : result.getMetrics()) {
                 // On prend la dernière valeur moyenne disponible
                 metric.getTimeSeries().stream()
-                    .flatMap(ts -> ts.getValues().stream())
-                    .reduce((first, second) -> second) // Prend le dernier élément
-                    .ifPresent(val -> {
-                        String name = metric.getMetricName();
-                        Double value = val.getAverage();
-                        
-                        if ("Percentage CPU".equals(name)) {
-                            data.put("cpuUsage", value);
-                        } else if ("Network In".equals(name) || "Network Out".equals(name)) {
-                            // On somme in/out pour avoir une idée du débit
-                            data.merge("networkThroughput", value, (a, b) -> (Double)a + (Double)b);
-                        } else if ("Disk Read Bytes".equals(name) || "Disk Write Bytes".equals(name)) {
-                             // On utilise ça comme proxy pour l'usage disque (activité)
-                             // Note: Azure Monitor ne donne pas le % d'espace disque libre sans agent spécifique
-                            data.merge("diskUsage", value > 0 ? 10.0 : 0.0, (a,b) -> (Double)a); 
-                        }
-                    });
+                        .flatMap(ts -> ts.getValues().stream())
+                        .reduce((first, second) -> second) // Prend le dernier élément
+                        .ifPresent(val -> {
+                            String name = metric.getMetricName();
+                            Double value = val.getAverage();
+
+                            if ("Percentage CPU".equals(name)) {
+                                data.put("cpuUsage", value);
+                            } else if ("Network In".equals(name) || "Network Out".equals(name)) {
+                                data.merge("networkThroughput", value, (a, b) -> (Double)a + (Double)b);
+                            } else if ("Disk Read Bytes".equals(name) || "Disk Write Bytes".equals(name)) {
+                                data.merge("diskUsage", value > 0 ? 10.0 : 0.0, (a,b) -> (Double)a);
+                            }
+                        });
             }
-            
+
             data.put("isAvailable", true);
             data.put("vmStatus", "RUNNING");
-            // uptime simulé si la VM répond (Azure ne donne pas l'uptime en secondes directement via metrics)
-            data.put("uptime", 300); 
+            data.put("uptime", 300); // uptime simulé
 
         } catch (Exception e) {
             log.warn("Impossible de lire les métriques Azure pour {}: {}", resourceId, e.getMessage());
@@ -117,17 +112,14 @@ public class MonitoringService {
      * Reconstruit l'ID de la ressource Azure à partir des infos de la VM
      */
     private String constructResourceId(VM vm) {
-        // Logique de nommage basée sur ton code Terraform
-        // rgName = rg-{vm_name}-{demande_id}
         String rgName = "rg-" + vm.getVmName() + "-" + vm.getDemande().getId();
-        
         return String.format(
             "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/virtualMachines/%s",
             SUBSCRIPTION_ID, rgName, vm.getVmName()
         );
     }
 
-    // --- TES MÉTHODES EXISTANTES (INCHANGÉES) ---
+    // --- MÉTHODES EXISTANTES ---
 
     public MonitoringMetrics collectMetrics(String vmId, String source, Map<String, Object> metricsData) {
         VM vm = vmRepository.findById(vmId)
@@ -160,7 +152,6 @@ public class MonitoringService {
             metrics.setIsAvailable(Boolean.parseBoolean(metricsData.get("isAvailable").toString()));
         }
         if (metricsData.containsKey("uptime")) {
-            // Gestion sûre du cast en Integer
             Object uptimeObj = metricsData.get("uptime");
             if (uptimeObj instanceof Number) {
                 metrics.setUptime(((Number) uptimeObj).intValue());
