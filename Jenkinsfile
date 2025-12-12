@@ -108,11 +108,14 @@ pipeline {
             }
         }
 
-        stage('OWASP Dependency-Check') {
+stage('OWASP Dependency-Check') {
     steps {
         catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
             withCredentials([string(credentialsId: 'nvd-api-key', variable: 'NVD_API_KEY')]) {
+                // Créer le dossier pour les rapports
                 sh 'mkdir -p dependency-check-report'
+
+                // Lancer le scan
                 sh """
                     dependency-check \
                       --project "MonProjet" \
@@ -122,8 +125,12 @@ pipeline {
                       --format ALL \
                       --nvdApiKey \$NVD_API_KEY
                 """
+
+                // Lister les fichiers pour debug
                 sh 'ls -l dependency-check-report'
             }
+
+            // Publier les rapports
             dependencyCheckPublisher pattern: 'dependency-check-report/dependency-check-report.xml'
         }
     }
